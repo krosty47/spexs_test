@@ -25,6 +25,7 @@
     "@nestjs/jwt": "^10.2.0",
     "@nestjs/passport": "^10.0.3",
     "@nestjs/platform-fastify": "^10.4.0",
+    "@nestjs/schedule": "^4.1.2",
     "@prisma/client": "^6.3.0",
     "@trpc/server": "^11.16.0",
     "@workflow-manager/prisma": "workspace:*",

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { resolve } from 'path';
 import { validate } from './config/env.validation';
 import { PrismaModule } from './database/prisma.module';
@@ -16,6 +17,7 @@ import { NotificationsModule } from './features/notifications/notifications.modu
       envFilePath: resolve(__dirname, '..', '..', '..', '.env'),
       validate,
     }),
+    ScheduleModule.forRoot(),
     PrismaModule,
     TrpcModule,
     AuthModule,

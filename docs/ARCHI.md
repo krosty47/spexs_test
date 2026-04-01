@@ -46,24 +46,24 @@ Workflow Manager is a full-stack application for creating and managing alert wor
 
 ## 3. Technology Stack
 
-| Layer          | Technology                  | Version  | Purpose                              |
-| -------------- | --------------------------- | -------- | ------------------------------------ |
-| **Runtime**    | Node.js                     | 20 LTS   | Server runtime                       |
-| **Backend**    | NestJS                      | 10+      | Backend framework                    |
-| **HTTP**       | Fastify                     | 5.x      | HTTP adapter (replaces Express)      |
-| **API**        | tRPC                        | v11      | End-to-end type-safe API layer       |
-| **tRPC bridge**| nestjs-trpc                 | latest   | tRPC integration for NestJS          |
-| **Frontend**   | Next.js                     | 15+      | React framework (App Router)         |
-| **UI**         | React                       | 19+      | UI library                           |
-| **Database**   | PostgreSQL                  | 16+      | Relational database                  |
-| **ORM**        | Prisma                      | latest   | Database ORM + migrations            |
-| **Validation** | Zod                         | latest   | Schema validation (tRPC + forms)     |
-| **Auth**       | JWT (httpOnly cookies)      | -        | Authentication with Passport         |
-| **Real-time**  | WebSocket / SSE             | -        | Live alert notifications             |
-| **Monorepo**   | Turborepo + pnpm            | latest   | Build orchestration + package manager|
-| **Styling**    | Tailwind CSS                | 4.x      | Utility-first CSS                    |
-| **UI Kit**     | shadcn/ui                   | latest   | Radix UI-based component library     |
-| **Containerization** | Docker + Docker Compose | -     | Local development environment        |
+| Layer                | Technology              | Version | Purpose                               |
+| -------------------- | ----------------------- | ------- | ------------------------------------- |
+| **Runtime**          | Node.js                 | 20 LTS  | Server runtime                        |
+| **Backend**          | NestJS                  | 10+     | Backend framework                     |
+| **HTTP**             | Fastify                 | 5.x     | HTTP adapter (replaces Express)       |
+| **API**              | tRPC                    | v11     | End-to-end type-safe API layer        |
+| **tRPC bridge**      | nestjs-trpc             | latest  | tRPC integration for NestJS           |
+| **Frontend**         | Next.js                 | 15+     | React framework (App Router)          |
+| **UI**               | React                   | 19+     | UI library                            |
+| **Database**         | PostgreSQL              | 16+     | Relational database                   |
+| **ORM**              | Prisma                  | latest  | Database ORM + migrations             |
+| **Validation**       | Zod                     | latest  | Schema validation (tRPC + forms)      |
+| **Auth**             | JWT (httpOnly cookies)  | -       | Authentication with Passport          |
+| **Real-time**        | WebSocket / SSE         | -       | Live alert notifications              |
+| **Monorepo**         | Turborepo + pnpm        | latest  | Build orchestration + package manager |
+| **Styling**          | Tailwind CSS            | 4.x     | Utility-first CSS                     |
+| **UI Kit**           | shadcn/ui               | latest  | Radix UI-based component library      |
+| **Containerization** | Docker + Docker Compose | -       | Local development environment         |
 
 ---
 
@@ -76,7 +76,7 @@ workflow-manager/
 │   │   └── src/
 │   │       ├── features/           # Feature modules (domain-driven)
 │   │       │   ├── workflows/      # CRUD, activate/deactivate
-│   │       │   ├── events/         # Trigger, history, resolve, snooze
+│   │       │   ├── events/         # Trigger, history, resolve, snooze, snooze-expiration cron
 │   │       │   ├── notifications/  # In-app + email channels
 │   │       │   ├── history/        # Paginated, filtered event history
 │   │       │   └── daily-summary/  # Cron-based daily reports
@@ -201,16 +201,16 @@ pnpm --filter prisma db:migrate    # Run migrations
 
 ### Environment Variables
 
-| Variable            | Description                    | Default       |
-| ------------------- | ------------------------------ | ------------- |
-| `DATABASE_URL`      | PostgreSQL connection string   | -             |
-| `JWT_SECRET`        | JWT signing secret (min 32ch)  | -             |
-| `JWT_REFRESH_SECRET`| Refresh token secret           | -             |
-| `JWT_EXPIRATION`    | Access token TTL               | `15m`         |
-| `COOKIE_DOMAIN`     | httpOnly cookie domain         | `localhost`   |
-| `RESEND_API_KEY`    | Email provider API key         | -             |
-| `REDIS_URL`         | Redis connection (queues/cache)| -             |
-| `NODE_ENV`          | Environment                    | `development` |
+| Variable             | Description                     | Default       |
+| -------------------- | ------------------------------- | ------------- |
+| `DATABASE_URL`       | PostgreSQL connection string    | -             |
+| `JWT_SECRET`         | JWT signing secret (min 32ch)   | -             |
+| `JWT_REFRESH_SECRET` | Refresh token secret            | -             |
+| `JWT_EXPIRATION`     | Access token TTL                | `15m`         |
+| `COOKIE_DOMAIN`      | httpOnly cookie domain          | `localhost`   |
+| `RESEND_API_KEY`     | Email provider API key          | -             |
+| `REDIS_URL`          | Redis connection (queues/cache) | -             |
+| `NODE_ENV`           | Environment                     | `development` |
 
 ### Configuration Approach
 
@@ -242,8 +242,8 @@ export type AppRouter = typeof appRouter;
 ```typescript
 // context.ts - Auth + DB injected into every procedure
 export const createContext = (req: FastifyRequest) => ({
-  user: req.user,        // From JWT cookie
-  prisma: prismaClient,  // Shared Prisma instance
+  user: req.user, // From JWT cookie
+  prisma: prismaClient, // Shared Prisma instance
 });
 ```
 
@@ -356,6 +356,14 @@ WebSocket (via `@nestjs/websockets` + Fastify WebSocket adapter) for pushing liv
 
 ## 13. Background Jobs
 
+### Snooze Expiration (Cron)
+
+- `SnoozeExpirationService` in `features/events/` runs every 5 minutes via `@Cron('*/5 * * * *')`
+- Queries SNOOZED events with `snooze.until <= now()` using indexed `until` column
+- In a transaction: sets status to OPEN, creates REOPENED history entry, deletes Snooze record
+- Notifies via `NotificationsService` for each reopened event
+- Requires `ScheduleModule.forRoot()` registered in `AppModule`
+
 ### Daily Summary (Cron)
 
 - NestJS `@Cron()` decorator for scheduling
@@ -389,13 +397,13 @@ WebSocket (via `@nestjs/websockets` + Fastify WebSocket adapter) for pushing liv
 
 ## 15. State Management (Frontend)
 
-| State Type     | Solution                          | Example                          |
-| -------------- | --------------------------------- | -------------------------------- |
-| Server state   | tRPC + React Query (built-in)     | Workflows list, event details    |
-| Local UI state | `useState`                        | Modal open/close, form inputs    |
-| Global client  | Zustand (if needed)               | Theme, sidebar collapsed         |
-| URL state      | Next.js searchParams              | Filters, pagination              |
-| Real-time      | WebSocket subscription + React Query invalidation | Live alerts |
+| State Type     | Solution                                          | Example                       |
+| -------------- | ------------------------------------------------- | ----------------------------- |
+| Server state   | tRPC + React Query (built-in)                     | Workflows list, event details |
+| Local UI state | `useState`                                        | Modal open/close, form inputs |
+| Global client  | Zustand (if needed)                               | Theme, sidebar collapsed      |
+| URL state      | Next.js searchParams                              | Filters, pagination           |
+| Real-time      | WebSocket subscription + React Query invalidation | Live alerts                   |
 
 ### Key Rule
 
@@ -416,6 +424,7 @@ app/
 │   ├── layout.tsx              # Dashboard shell (sidebar, header)
 │   ├── workflows/
 │   │   ├── page.tsx            # List workflows
+│   │   ├── new/page.tsx        # Create workflow (static route)
 │   │   └── [id]/page.tsx       # Workflow detail
 │   ├── events/
 │   │   ├── page.tsx            # Active events
@@ -519,18 +528,18 @@ sequenceDiagram
 
 ### Backend
 
-| Type        | Framework  | Location                            | Purpose                    |
-| ----------- | ---------- | ----------------------------------- | -------------------------- |
-| Unit        | Jest       | `*.spec.ts` (co-located)            | Service logic, validators  |
-| Integration | Jest       | `test/` directory                   | tRPC router + DB           |
-| E2E         | Playwright | `apps/frontend/e2e/` or separate    | Full user flows            |
+| Type        | Framework  | Location                         | Purpose                   |
+| ----------- | ---------- | -------------------------------- | ------------------------- |
+| Unit        | Jest       | `*.spec.ts` (co-located)         | Service logic, validators |
+| Integration | Jest       | `test/` directory                | tRPC router + DB          |
+| E2E         | Playwright | `apps/frontend/e2e/` or separate | Full user flows           |
 
 ### Frontend
 
-| Type      | Framework            | Location                 | Purpose                     |
-| --------- | -------------------- | ------------------------ | --------------------------- |
-| Unit      | Vitest + Testing Lib | `*.test.tsx` (co-located)| Component rendering, hooks  |
-| E2E       | Playwright           | `e2e/`                   | Critical user journeys      |
+| Type | Framework            | Location                  | Purpose                    |
+| ---- | -------------------- | ------------------------- | -------------------------- |
+| Unit | Vitest + Testing Lib | `*.test.tsx` (co-located) | Component rendering, hooks |
+| E2E  | Playwright           | `e2e/`                    | Critical user journeys     |
 
 ### Coverage Expectations
 
@@ -596,6 +605,7 @@ Workflow Manager is a type-safe full-stack monorepo application designed around 
 4. **Security** - httpOnly JWT cookies, input validation at every boundary, CORS + Helmet
 
 Key architectural decisions:
+
 - tRPC over REST for type safety (no OpenAPI spec needed)
 - Fastify over Express for better performance
 - Feature folders over layer-based organization for scalability

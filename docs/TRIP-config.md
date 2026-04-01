@@ -1,20 +1,24 @@
 # TRIP Project Config
 
 ## Project
+
 name: Workflow Manager
 version_file: package.json
 main_branch: main
 week_anchor_date: 31-03-2026
 
 ## Tutorials
+
 enabled: false
 
 ## Test Commands
+
 run_all: pnpm test
 run_single: pnpm --filter backend test -- <filename>
 coverage: pnpm --filter backend test:cov
 
 ## Technical Considerations
+
 - **Monorepo**: Changes to `packages/prisma` or `packages/shared` may affect both apps. Always run tests for both apps after modifying shared packages.
 - **tRPC type safety**: After changing a tRPC router or Zod schema, the frontend automatically gets updated types. Verify no type errors in the frontend after backend API changes.
 - **Prisma migrations**: After changing `schema.prisma`, run `prisma migrate dev` to generate and apply migrations. Never edit applied migrations.
@@ -26,6 +30,7 @@ coverage: pnpm --filter backend test:cov
 - **Server Components by default**: In Next.js, only add `"use client"` when the component needs interactivity or browser APIs.
 
 ## Review Checklist Additions
+
 - [ ] tRPC inputs validated with Zod schemas
 - [ ] Prisma queries use `select`/`include` deliberately (no full-row fetches)
 - [ ] No N+1 queries (check for loops with DB calls)
@@ -38,6 +43,7 @@ coverage: pnpm --filter backend test:cov
 - [ ] Server Components used by default, `"use client"` only when needed
 
 ## Test Structure & Priorities
+
 - Backend tests: co-located `*.spec.ts` files, mock Prisma with `jest-mock-extended`
 - Frontend tests: co-located `*.test.tsx` files, use Vitest + Testing Library
 - E2E tests: `apps/frontend/e2e/` with Playwright

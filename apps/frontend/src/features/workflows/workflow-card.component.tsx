@@ -31,32 +31,50 @@ export function WorkflowCard({ workflow, onToggle, onDelete }: WorkflowCardProps
               {workflow.name}
             </Link>
           </CardTitle>
-          <Badge
-            variant={workflow.isActive ? 'default' : 'secondary'}
-            className="shrink-0 text-xs"
-          >
+          <Badge variant={workflow.isActive ? 'default' : 'secondary'} className="shrink-0 text-xs">
             {workflow.isActive ? 'Active' : 'Inactive'}
           </Badge>
         </div>
         {workflow.description && (
-          <CardDescription className="line-clamp-2 text-sm">
-            {workflow.description}
-          </CardDescription>
+          <CardDescription className="line-clamp-2 text-sm">{workflow.description}</CardDescription>
         )}
       </CardHeader>
       <CardContent className="flex-1 pb-3">
         <div className="flex items-center gap-4 text-sm text-[var(--muted-foreground)]">
           <span className="flex items-center gap-1.5">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="m16 12-4-4-4 4"/><path d="M12 16V8"/></svg>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path d="m16 12-4-4-4 4" />
+              <path d="M12 16V8" />
+            </svg>
             {eventCount} {eventCount === 1 ? 'event' : 'events'}
           </span>
         </div>
       </CardContent>
       <CardFooter className="gap-2 border-t pt-3">
-        <Button variant="outline" size="sm" className="flex-1" onClick={() => onToggle(workflow.id)}>
+        <Button
+          variant="outline"
+          size="sm"
+          className="flex-1"
+          onClick={() => onToggle(workflow.id)}
+        >
           {workflow.isActive ? 'Deactivate' : 'Activate'}
         </Button>
-        <Button variant="destructive" size="sm" className="flex-1" onClick={() => onDelete(workflow.id)}>
+        <Button
+          variant="destructive"
+          size="sm"
+          className="flex-1"
+          onClick={() => onDelete(workflow.id)}
+        >
           Delete
         </Button>
       </CardFooter>

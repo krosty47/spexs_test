@@ -24,6 +24,7 @@ src/features/workflows/
 ```
 
 **Key rules:**
+
 - `@Global()` sparingly — only for database, config, and auth modules
 - Export only what other modules need; keep internals private
 - Each feature module can be moved or extracted independently
@@ -82,6 +83,7 @@ Request → Middleware → Guards → Interceptors (pre) → Pipes → Handler �
 ```
 
 Apply logic at the right layer:
+
 - **Middleware**: Logging, correlation IDs
 - **Guards**: JWT verification, role checks
 - **Interceptors**: Response transformation, timing
@@ -171,14 +173,14 @@ type CreateWorkflowInput = z.infer<typeof createWorkflowSchema>;
 
 Map domain errors to tRPC codes consistently:
 
-| Domain Situation          | tRPC Code        |
-| ------------------------- | ---------------- |
-| Resource not found        | `NOT_FOUND`      |
-| Duplicate / conflict      | `CONFLICT`       |
-| Validation failure        | `BAD_REQUEST`    |
-| Not authenticated         | `UNAUTHORIZED`   |
-| Not authorized            | `FORBIDDEN`      |
-| Server error              | `INTERNAL_SERVER_ERROR` |
+| Domain Situation     | tRPC Code               |
+| -------------------- | ----------------------- |
+| Resource not found   | `NOT_FOUND`             |
+| Duplicate / conflict | `CONFLICT`              |
+| Validation failure   | `BAD_REQUEST`           |
+| Not authenticated    | `UNAUTHORIZED`          |
+| Not authorized       | `FORBIDDEN`             |
+| Server error         | `INTERNAL_SERVER_ERROR` |
 
 ### Middleware
 
@@ -298,7 +300,7 @@ export default async function WorkflowsPage() {
 }
 
 // Client Component: only when interactivity is needed
-"use client";
+('use client');
 export const WorkflowFilter = ({ onFilter }: Props): ReactNode => {
   const [search, setSearch] = useState('');
   // ...
@@ -370,14 +372,14 @@ export const WorkflowCard = ({ workflow, onEdit }: Props): ReactNode => {
 
 ### Component Extraction Rules
 
-| Condition             | Threshold                           | Action               |
-| --------------------- | ----------------------------------- | -------------------- |
-| JSX depth/complexity  | > 3 nested tags or > 10 lines      | Extract component    |
-| Props received        | > 2 props being passed down         | Extract component    |
-| Logic involved        | Any `.map()`, conditionals          | Extract component    |
-| Reusability           | Same JSX pattern 2+ times           | Shared component     |
-| Component size        | > 150 lines                         | Split sub-components |
-| Logic in component    | > 5 lines of logic                  | Extract to hook      |
+| Condition            | Threshold                     | Action               |
+| -------------------- | ----------------------------- | -------------------- |
+| JSX depth/complexity | > 3 nested tags or > 10 lines | Extract component    |
+| Props received       | > 2 props being passed down   | Extract component    |
+| Logic involved       | Any `.map()`, conditionals    | Extract component    |
+| Reusability          | Same JSX pattern 2+ times     | Shared component     |
+| Component size       | > 150 lines                   | Split sub-components |
+| Logic in component   | > 5 lines of logic            | Extract to hook      |
 
 ### Naming Conventions
 
@@ -554,10 +556,7 @@ describe('WorkflowService', () => {
 
   beforeEach(async () => {
     const module = await Test.createTestingModule({
-      providers: [
-        WorkflowService,
-        { provide: PrismaService, useValue: mockDeep<PrismaClient>() },
-      ],
+      providers: [WorkflowService, { provide: PrismaService, useValue: mockDeep<PrismaClient>() }],
     }).compile();
 
     service = module.get(WorkflowService);
