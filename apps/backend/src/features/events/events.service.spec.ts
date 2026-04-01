@@ -1,9 +1,9 @@
 import { Test, type TestingModule } from '@nestjs/testing';
-import { TRPCError } from '@trpc/server';
 import { mockDeep, type DeepMockProxy } from 'jest-mock-extended';
 import { type PrismaClient } from '@prisma/client';
 import { EventsService } from './events.service';
 import { PrismaService } from '../../database/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 const mockEvent = {
   id: 'evt-1',
@@ -25,13 +25,46 @@ const mockResolvedEvent = {
   resolvedById: 'user-1',
 };
 
+const mockWorkflow = {
+  id: 'wf-1',
+  name: 'Test Workflow',
+  description: null,
+  isActive: true,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  userId: 'user-1',
+};
+
+function createTxMock() {
+  const txMock = mockDeep<PrismaClient>();
+  return txMock;
+}
+
+function setupTransaction(
+  prisma: DeepMockProxy<PrismaClient>,
+  txMock: DeepMockProxy<PrismaClient>,
+) {
+  (prisma.$transaction as jest.Mock).mockImplementation(
+    async (callback: (tx: PrismaClient) => Promise<unknown>) => {
+      return callback(txMock);
+    },
+  );
+}
+
 describe('EventsService', () => {
   let service: EventsService;
   let prisma: DeepMockProxy<PrismaClient>;
+  let notificationsService: { notify: jest.Mock };
 
   beforeEach(async () => {
+    notificationsService = { notify: jest.fn().mockResolvedValue(undefined) };
+
     const module: TestingModule = await Test.createTestingModule({
-      providers: [EventsService, { provide: PrismaService, useValue: mockDeep<PrismaClient>() }],
+      providers: [
+        EventsService,
+        { provide: PrismaService, useValue: mockDeep<PrismaClient>() },
+        { provide: NotificationsService, useValue: notificationsService },
+      ],
     }).compile();
 
     service = module.get<EventsService>(EventsService);
@@ -77,9 +110,20 @@ describe('EventsService', () => {
   });
 
   describe('trigger', () => {
-    it('should create event', async () => {
-      prisma.event.findFirst.mockResolvedValue(null);
-      prisma.event.create.mockResolvedValue(mockEvent);
+    it('should create event with TRIGGERED history in a transaction', async () => {
+      const txMock = createTxMock();
+      txMock.event.findFirst.mockResolvedValue(null);
+      txMock.event.create.mockResolvedValue(mockEvent);
+      txMock.eventHistory.create.mockResolvedValue({
+        id: 'hist-1',
+        action: 'TRIGGERED',
+        createdAt: new Date(),
+        eventId: 'evt-1',
+        userId: 'system',
+      });
+
+      prisma.workflow.findUnique.mockResolvedValue(mockWorkflow);
+      setupTransaction(prisma, txMock);
 
       const result = await service.trigger({
         title: 'Test Event',
@@ -88,18 +132,101 @@ describe('EventsService', () => {
       });
 
       expect(result.title).toBe('Test Event');
+      expect(txMock.eventHistory.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          action: 'TRIGGERED',
+          eventId: 'evt-1',
+        }),
+      });
     });
 
-    it('should reject duplicate open events for same workflow', async () => {
-      prisma.event.findFirst.mockResolvedValue(mockEvent);
+    it('should throw NOT_FOUND when workflow does not exist', async () => {
+      prisma.workflow.findUnique.mockResolvedValue(null);
 
       await expect(
         service.trigger({
-          title: 'Duplicate Event',
+          title: 'Test Event',
+          payload: {},
+          workflowId: 'wf-nonexistent',
+        }),
+      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    });
+
+    it('should throw BAD_REQUEST when workflow is inactive', async () => {
+      prisma.workflow.findUnique.mockResolvedValue({ ...mockWorkflow, isActive: false });
+
+      await expect(
+        service.trigger({
+          title: 'Test Event',
           payload: {},
           workflowId: 'wf-1',
         }),
-      ).rejects.toThrow(TRPCError);
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    });
+
+    it('should call NotificationsService.notify after creation', async () => {
+      const txMock = createTxMock();
+      txMock.event.findFirst.mockResolvedValue(null);
+      txMock.event.create.mockResolvedValue(mockEvent);
+      txMock.eventHistory.create.mockResolvedValue({
+        id: 'hist-1',
+        action: 'TRIGGERED',
+        createdAt: new Date(),
+        eventId: 'evt-1',
+        userId: 'system',
+      });
+
+      prisma.workflow.findUnique.mockResolvedValue(mockWorkflow);
+      setupTransaction(prisma, txMock);
+
+      await service.trigger({
+        title: 'Test Event',
+        payload: { key: 'value' },
+        workflowId: 'wf-1',
+      });
+
+      expect(notificationsService.notify).toHaveBeenCalledWith(
+        'system',
+        'event.triggered',
+        expect.objectContaining({ eventId: 'evt-1' }),
+      );
+    });
+
+    it('should use triggeredBy userId when provided', async () => {
+      const txMock = createTxMock();
+      txMock.event.findFirst.mockResolvedValue(null);
+      txMock.event.create.mockResolvedValue(mockEvent);
+      txMock.eventHistory.create.mockResolvedValue({
+        id: 'hist-1',
+        action: 'TRIGGERED',
+        createdAt: new Date(),
+        eventId: 'evt-1',
+        userId: 'user-1',
+      });
+
+      prisma.workflow.findUnique.mockResolvedValue(mockWorkflow);
+      setupTransaction(prisma, txMock);
+
+      await service.trigger({ title: 'Test Event', payload: {}, workflowId: 'wf-1' }, 'user-1');
+
+      expect(txMock.eventHistory.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          userId: 'user-1',
+        }),
+      });
+      expect(notificationsService.notify).toHaveBeenCalledWith(
+        'user-1',
+        'event.triggered',
+        expect.objectContaining({ eventId: 'evt-1' }),
+      );
+    });
+
+    it('should reject duplicate open events for same workflow', async () => {
+      const txMock = createTxMock();
+      txMock.event.findFirst.mockResolvedValue(mockEvent);
+
+      prisma.workflow.findUnique.mockResolvedValue(mockWorkflow);
+      setupTransaction(prisma, txMock);
 
       await expect(
         service.trigger({
@@ -113,7 +240,7 @@ describe('EventsService', () => {
 
   describe('resolve', () => {
     it('should set status to RESOLVED and create history entry', async () => {
-      const txMock = mockDeep<PrismaClient>();
+      const txMock = createTxMock();
       txMock.event.findUnique.mockResolvedValue(mockEvent);
       txMock.event.update.mockResolvedValue(mockResolvedEvent);
       txMock.eventHistory.create.mockResolvedValue({
@@ -124,12 +251,7 @@ describe('EventsService', () => {
         userId: 'user-1',
       });
 
-      // Mock $transaction to execute the callback with the transaction mock
-      (prisma.$transaction as jest.Mock).mockImplementation(
-        async (callback: (tx: PrismaClient) => Promise<unknown>) => {
-          return callback(txMock);
-        },
-      );
+      setupTransaction(prisma, txMock);
 
       const result = await service.resolve('evt-1', 'user-1');
 
@@ -144,14 +266,10 @@ describe('EventsService', () => {
     });
 
     it('should throw NOT_FOUND for missing event', async () => {
-      const txMock = mockDeep<PrismaClient>();
+      const txMock = createTxMock();
       txMock.event.findUnique.mockResolvedValue(null);
 
-      (prisma.$transaction as jest.Mock).mockImplementation(
-        async (callback: (tx: PrismaClient) => Promise<unknown>) => {
-          return callback(txMock);
-        },
-      );
+      setupTransaction(prisma, txMock);
 
       await expect(service.resolve('nonexistent', 'user-1')).rejects.toMatchObject({
         code: 'NOT_FOUND',
@@ -162,7 +280,7 @@ describe('EventsService', () => {
   describe('snooze', () => {
     it('should create Snooze record and history entry', async () => {
       const snoozedEvent = { ...mockEvent, status: 'SNOOZED' as const };
-      const txMock = mockDeep<PrismaClient>();
+      const txMock = createTxMock();
       txMock.event.findUnique.mockResolvedValue(mockEvent);
       txMock.event.update.mockResolvedValue(snoozedEvent);
       txMock.snooze.create.mockResolvedValue({
@@ -181,11 +299,7 @@ describe('EventsService', () => {
         userId: 'user-1',
       });
 
-      (prisma.$transaction as jest.Mock).mockImplementation(
-        async (callback: (tx: PrismaClient) => Promise<unknown>) => {
-          return callback(txMock);
-        },
-      );
+      setupTransaction(prisma, txMock);
 
       const snoozeUntil = new Date(Date.now() + 3600000);
       const result = await service.snooze(

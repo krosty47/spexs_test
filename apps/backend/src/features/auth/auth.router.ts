@@ -37,7 +37,9 @@ export class AuthRouter {
   }
 
   private setAuthCookies(ctx: AppContextType, accessToken: string, refreshToken: string): void {
-    const res = ctx.res as { setCookie: (name: string, value: string, opts: Record<string, unknown>) => void };
+    const res = ctx.res as {
+      setCookie: (name: string, value: string, opts: Record<string, unknown>) => void;
+    };
     const cookieOpts = {
       httpOnly: true,
       secure: false,

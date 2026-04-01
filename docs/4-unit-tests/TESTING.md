@@ -69,10 +69,7 @@ describe('WorkflowService', () => {
 
   beforeEach(async () => {
     const module = await Test.createTestingModule({
-      providers: [
-        WorkflowService,
-        { provide: PrismaService, useValue: mockDeep<PrismaClient>() },
-      ],
+      providers: [WorkflowService, { provide: PrismaService, useValue: mockDeep<PrismaClient>() }],
     }).compile();
 
     service = module.get(WorkflowService);

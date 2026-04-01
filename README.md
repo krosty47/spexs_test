@@ -2,13 +2,13 @@
 
 A full-stack alert workflow management app built with a pnpm monorepo.
 
-| Layer      | Stack                                         |
-| ---------- | --------------------------------------------- |
-| Frontend   | Next.js 15, React 19, tRPC, shadcn/ui, Tailwind CSS |
-| Backend    | NestJS 10, Fastify, tRPC, Passport JWT        |
-| Database   | PostgreSQL 16, Prisma ORM                     |
-| Cache      | Redis 7                                       |
-| Tooling    | pnpm workspaces, Turborepo, TypeScript 5      |
+| Layer    | Stack                                               |
+| -------- | --------------------------------------------------- |
+| Frontend | Next.js 15, React 19, tRPC, shadcn/ui, Tailwind CSS |
+| Backend  | NestJS 10, Fastify, tRPC, Passport JWT              |
+| Database | PostgreSQL 16, Prisma ORM                           |
+| Cache    | Redis 7                                             |
+| Tooling  | pnpm workspaces, Turborepo, TypeScript 5            |
 
 ## Prerequisites
 
@@ -68,19 +68,19 @@ pnpm dev
 
 This starts both apps concurrently via Turborepo:
 
-| App      | URL                        |
-| -------- | -------------------------- |
-| Frontend | http://localhost:3000       |
-| Backend  | http://localhost:4000       |
+| App      | URL                   |
+| -------- | --------------------- |
+| Frontend | http://localhost:3000 |
+| Backend  | http://localhost:4000 |
 
 ### 6. Log in
 
 Use one of the seeded accounts:
 
-| Email               | Password        | Role  |
-| ------------------- | --------------- | ----- |
-| admin@workflow.dev  | password12345   | Admin |
-| user@workflow.dev   | password12345   | User  |
+| Email              | Password      | Role  |
+| ------------------ | ------------- | ----- |
+| admin@workflow.dev | password12345 | Admin |
+| user@workflow.dev  | password12345 | User  |
 
 ## Project Structure
 
@@ -117,14 +117,14 @@ Run these from the project root:
 
 See [`.env.example`](.env.example) for all available variables:
 
-| Variable                  | Description                        | Default                    |
-| ------------------------- | ---------------------------------- | -------------------------- |
-| `DATABASE_URL`            | PostgreSQL connection string       | (see .env.example)         |
-| `JWT_SECRET`              | Access token signing key (32+ ch)  | -                          |
-| `JWT_REFRESH_SECRET`      | Refresh token signing key (32+ ch) | -                          |
-| `JWT_EXPIRATION`          | Access token TTL                   | `15m`                      |
-| `REDIS_URL`               | Redis connection string            | `redis://localhost:6380`   |
-| `REDIS_PASSWORD`          | Redis authentication password      | `redisdevpass`             |
-| `CORS_ORIGIN`             | Allowed frontend origin            | `http://localhost:3000`    |
-| `PORT`                    | Backend port                       | `4000`                     |
-| `NEXT_PUBLIC_BACKEND_URL` | Backend URL for the frontend       | `http://localhost:4000`    |
+| Variable                  | Description                        | Default                  |
+| ------------------------- | ---------------------------------- | ------------------------ |
+| `DATABASE_URL`            | PostgreSQL connection string       | (see .env.example)       |
+| `JWT_SECRET`              | Access token signing key (32+ ch)  | -                        |
+| `JWT_REFRESH_SECRET`      | Refresh token signing key (32+ ch) | -                        |
+| `JWT_EXPIRATION`          | Access token TTL                   | `15m`                    |
+| `REDIS_URL`               | Redis connection string            | `redis://localhost:6380` |
+| `REDIS_PASSWORD`          | Redis authentication password      | `redisdevpass`           |
+| `CORS_ORIGIN`             | Allowed frontend origin            | `http://localhost:3000`  |
+| `PORT`                    | Backend port                       | `4000`                   |
+| `NEXT_PUBLIC_BACKEND_URL` | Backend URL for the frontend       | `http://localhost:4000`  |

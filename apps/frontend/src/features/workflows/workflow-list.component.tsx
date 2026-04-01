@@ -2,6 +2,7 @@
 
 import { trpc } from '@/lib/trpc';
 import { WorkflowCard } from './workflow-card.component';
+import type { Workflow } from './workflow.types';
 
 export function WorkflowList() {
   const utils = trpc.useUtils();
@@ -26,7 +27,7 @@ export function WorkflowList() {
     return <p className="text-[var(--destructive)]">Error: {workflowsQuery.error.message}</p>;
   }
 
-  const workflows = workflowsQuery.data?.data ?? [];
+  const workflows: Workflow[] = workflowsQuery.data?.data ?? [];
 
   if (workflows.length === 0) {
     return (
@@ -36,8 +37,7 @@ export function WorkflowList() {
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-      {workflows.map((workflow: any) => (
+      {workflows.map((workflow) => (
         <WorkflowCard
           key={workflow.id}
           workflow={workflow}

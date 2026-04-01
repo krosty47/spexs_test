@@ -16,9 +16,7 @@ import Link from 'next/link';
 function StatusBadge({ status }: { status: string }) {
   return (
     <Badge
-      variant={
-        status === 'OPEN' ? 'destructive' : status === 'RESOLVED' ? 'default' : 'secondary'
-      }
+      variant={status === 'OPEN' ? 'destructive' : status === 'RESOLVED' ? 'default' : 'secondary'}
     >
       {status}
     </Badge>

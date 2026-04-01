@@ -39,8 +39,8 @@ export class EventsRouter {
   }
 
   @Mutation({ input: triggerEventSchema })
-  async trigger(@Input() input: z.infer<typeof triggerEventSchema>) {
-    return this.eventsService.trigger(input);
+  async trigger(@Input() input: z.infer<typeof triggerEventSchema>, @Ctx() ctx: AppContextType) {
+    return this.eventsService.trigger(input, ctx.user?.id);
   }
 
   @Mutation({ input: z.object({ id: z.string() }) })

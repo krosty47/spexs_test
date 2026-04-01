@@ -6,6 +6,19 @@ const prisma = new PrismaClient();
 const PASSWORD_HASH = '$2b$12$mG.QXtxZvgszMQ2QRF2X3uM18YiAOTuoGJOftI2w/.IHlyiW5Xs7O';
 
 async function main() {
+  // Seed system user (used for system-generated EventHistory entries)
+  const systemUser = await prisma.user.upsert({
+    where: { email: 'system@workflow.internal' },
+    update: {},
+    create: {
+      id: 'system',
+      email: 'system@workflow.internal',
+      name: 'System',
+      passwordHash: 'NOLOGIN',
+      role: Role.USER,
+    },
+  });
+
   // Seed users (passwords: "password12345" hashed with bcrypt cost 12)
   const adminUser = await prisma.user.upsert({
     where: { email: 'admin@workflow.dev' },
@@ -128,6 +141,47 @@ async function main() {
       workflowId: workflow3.id,
     },
   });
+
+  // Seed additional events for pagination testing (events 6-30)
+  const servers = [
+    'web-01',
+    'web-02',
+    'api-01',
+    'api-02',
+    'worker-01',
+    'worker-02',
+    'redis-01',
+    'pg-replica-01',
+    'lb-01',
+    'monitor-01',
+  ];
+  const statuses = [EventStatus.OPEN, EventStatus.RESOLVED, EventStatus.SNOOZED];
+  const workflows = [workflow1, workflow2, workflow3];
+
+  for (let i = 6; i <= 30; i++) {
+    const server = servers[(i - 6) % servers.length];
+    const status = statuses[i % 3];
+    const workflow = workflows[i % 3];
+
+    await prisma.event.upsert({
+      where: { id: `seed-event-${i}` },
+      update: {},
+      create: {
+        id: `seed-event-${i}`,
+        title: `Alert on ${server} (#${i})`,
+        payload: {
+          server,
+          metric: 90 + (i % 10),
+          timestamp: new Date(Date.now() - i * 3600000).toISOString(),
+        },
+        status,
+        workflowId: workflow.id,
+        ...(status === EventStatus.RESOLVED
+          ? { resolvedAt: new Date(), resolvedById: adminUser.id }
+          : {}),
+      },
+    });
+  }
 
   // Seed event history
   await prisma.eventHistory.upsert({

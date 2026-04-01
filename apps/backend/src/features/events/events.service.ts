@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { TRPCError } from '@trpc/server';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import type {
   TriggerEventInput,
   SnoozeEventInput,
@@ -11,7 +12,12 @@ import type {
 
 @Injectable()
 export class EventsService {
-  constructor(private readonly prisma: PrismaService) {}
+  static readonly SYSTEM_USER_ID = 'system';
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   async findAll(pagination: PaginationInput, filters?: EventFilterInput) {
     const skip = (pagination.page - 1) * pagination.limit;
@@ -74,29 +80,73 @@ export class EventsService {
     return event;
   }
 
-  async trigger(input: TriggerEventInput) {
-    // Deduplication check: no duplicate OPEN events for the same workflow
-    const existingOpen = await this.prisma.event.findFirst({
-      where: {
-        workflowId: input.workflowId,
-        status: 'OPEN',
-      },
+  async trigger(input: TriggerEventInput, triggeredBy?: string) {
+    const userId = triggeredBy ?? EventsService.SYSTEM_USER_ID;
+
+    // Validate workflow exists and is active
+    const workflow = await this.prisma.workflow.findUnique({
+      where: { id: input.workflowId },
+      select: { id: true, isActive: true },
     });
 
-    if (existingOpen) {
+    if (!workflow) {
       throw new TRPCError({
-        code: 'CONFLICT',
-        message: 'An open event already exists for this workflow',
+        code: 'NOT_FOUND',
+        message: `Workflow ${input.workflowId} not found`,
       });
     }
 
-    return this.prisma.event.create({
-      data: {
-        title: input.title,
-        payload: input.payload as Prisma.InputJsonValue,
-        workflowId: input.workflowId,
-      },
+    if (!workflow.isActive) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Workflow is not active',
+      });
+    }
+
+    // Wrap event creation + history in a transaction
+    const event = await this.prisma.$transaction(async (tx) => {
+      // Deduplication check: no duplicate OPEN events for the same workflow
+      const existingOpen = await tx.event.findFirst({
+        where: {
+          workflowId: input.workflowId,
+          status: 'OPEN',
+        },
+      });
+
+      if (existingOpen) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'An open event already exists for this workflow',
+        });
+      }
+
+      const created = await tx.event.create({
+        data: {
+          title: input.title,
+          payload: input.payload as Prisma.InputJsonValue,
+          workflowId: input.workflowId,
+        },
+      });
+
+      await tx.eventHistory.create({
+        data: {
+          action: 'TRIGGERED',
+          eventId: created.id,
+          userId,
+        },
+      });
+
+      return created;
     });
+
+    // Notify after successful transaction
+    await this.notificationsService.notify(userId, 'event.triggered', {
+      eventId: event.id,
+      title: event.title,
+      workflowId: event.workflowId,
+    });
+
+    return event;
   }
 
   async resolve(id: string, userId: string) {

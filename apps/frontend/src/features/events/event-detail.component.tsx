@@ -52,13 +52,14 @@ export function EventDetail({ eventId }: EventDetailProps) {
   if (!event) return null;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">{event.title}</h2>
-          <p className="text-[var(--muted-foreground)]">Workflow: {event.workflow.name}</p>
+    <div className="min-w-0 space-y-6">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h2 className="truncate text-xl font-bold sm:text-2xl">{event.title}</h2>
+          <p className="text-sm text-[var(--muted-foreground)]">Workflow: {event.workflow.name}</p>
         </div>
         <Badge
+          className="w-fit"
           variant={
             event.status === 'OPEN'
               ? 'destructive'
@@ -121,7 +122,7 @@ export function EventDetail({ eventId }: EventDetailProps) {
           <CardTitle>Payload</CardTitle>
         </CardHeader>
         <CardContent>
-          <pre className="rounded-md bg-[var(--muted)] p-4 text-sm">
+          <pre className="overflow-x-auto rounded-md bg-[var(--muted)] p-4 text-sm">
             {JSON.stringify(event.payload, null, 2)}
           </pre>
         </CardContent>
@@ -153,7 +154,7 @@ export function EventDetail({ eventId }: EventDetailProps) {
           )}
 
           <Separator />
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <Textarea
               placeholder="Add a comment..."
               value={comment}
@@ -161,6 +162,7 @@ export function EventDetail({ eventId }: EventDetailProps) {
               className="flex-1"
             />
             <Button
+              className="w-full sm:w-auto"
               onClick={() => addCommentMutation.mutate({ eventId, content: comment })}
               disabled={!comment.trim() || addCommentMutation.isPending}
             >
@@ -187,12 +189,15 @@ export function EventDetail({ eventId }: EventDetailProps) {
                   createdAt: string | Date;
                   user: { name: string };
                 }) => (
-                  <div key={h.id} className="flex items-center justify-between text-sm">
+                  <div
+                    key={h.id}
+                    className="flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between"
+                  >
                     <span>
                       <span className="font-medium">{h.user.name}</span> {h.action.toLowerCase()}{' '}
                       this event
                     </span>
-                    <span className="text-[var(--muted-foreground)]">
+                    <span className="text-xs text-[var(--muted-foreground)] sm:text-sm">
                       {new Date(h.createdAt).toLocaleString()}
                     </span>
                   </div>

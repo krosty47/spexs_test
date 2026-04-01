@@ -1,9 +1,11 @@
 # Guía de Desarrollo - Workflow Manager (NestJS + tRPC + Next.js)
 
 ## Objetivo
+
 Construir una aplicación fullstack para crear y gestionar workflows de alertas con **seguridad de tipos end-to-end**.
 
 **Stack oficial:**
+
 - Backend: **NestJS 10+** + **Fastify**
 - API: **tRPC v11** con **nestjs-trpc**
 - Frontend: **Next.js 15+ App Router**
@@ -147,3 +149,4 @@ B) package.json root + apps/backend y frontend
 C) schema.prisma completo con todos los modelos
 D) Ejemplo de un Feature Folder (workflows/ completo con router + service)
 E) Estructura exacta de TrpcModule con nestjs-trpc
+```
