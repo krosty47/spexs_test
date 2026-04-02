@@ -49,7 +49,7 @@ describe('AuthService', () => {
               const config: Record<string, string> = {
                 JWT_SECRET: 'test-secret-that-is-at-least-32-chars',
                 JWT_REFRESH_SECRET: 'test-refresh-secret-at-least-32-chars',
-                JWT_EXPIRATION: '15m',
+                JWT_EXPIRATION: '1h',
                 COOKIE_DOMAIN: 'localhost',
               };
               return config[key];

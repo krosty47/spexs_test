@@ -1,15 +1,24 @@
 import { Injectable } from '@nestjs/common';
 import { TRPCError } from '@trpc/server';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
+import { TriggerEvaluationService } from './trigger-evaluation.service';
+import { EventsService } from '../events/events.service';
+import { triggerConfigSchema } from '@workflow-manager/shared';
 import type {
   CreateWorkflowInput,
   UpdateWorkflowInput,
   PaginationInput,
+  SimulateWorkflowResult,
 } from '@workflow-manager/shared';
 
 @Injectable()
 export class WorkflowsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly triggerEvaluation: TriggerEvaluationService,
+    private readonly eventsService: EventsService,
+  ) {}
 
   async findAll(pagination: PaginationInput) {
     const skip = (pagination.page - 1) * pagination.limit;
@@ -63,6 +72,10 @@ export class WorkflowsService {
         name: input.name,
         description: input.description,
         isActive: input.isActive,
+        triggerType: input.triggerType,
+        triggerConfig: input.triggerConfig ?? undefined,
+        outputMessage: input.outputMessage,
+        recipients: input.recipients ?? [],
         userId,
       },
     });
@@ -71,9 +84,30 @@ export class WorkflowsService {
   async update(id: string, input: UpdateWorkflowInput) {
     await this.ensureExists(id);
 
+    // Build typed update data, converting null JSON fields to Prisma's DbNull
+    const data: Prisma.WorkflowUpdateInput = {
+      ...(input.name !== undefined && { name: input.name }),
+      ...(input.description !== undefined && { description: input.description }),
+      ...(input.isActive !== undefined && { isActive: input.isActive }),
+      ...(input.triggerType !== undefined && { triggerType: input.triggerType }),
+      ...(input.outputMessage !== undefined && { outputMessage: input.outputMessage }),
+    };
+
+    if (input.triggerConfig === null) {
+      data.triggerConfig = Prisma.DbNull;
+    } else if (input.triggerConfig !== undefined) {
+      data.triggerConfig = input.triggerConfig as Prisma.InputJsonValue;
+    }
+
+    if (input.recipients !== undefined) {
+      data.recipients = input.recipients === null
+        ? Prisma.DbNull
+        : (input.recipients as unknown as Prisma.InputJsonValue);
+    }
+
     return this.prisma.workflow.update({
       where: { id },
-      data: input,
+      data,
     });
   }
 
@@ -92,6 +126,65 @@ export class WorkflowsService {
     return this.prisma.workflow.delete({
       where: { id },
     });
+  }
+
+  async simulate(
+    id: string,
+    metricValue: number,
+    userId: string,
+    dryRun: boolean,
+  ): Promise<SimulateWorkflowResult> {
+    const workflow = await this.prisma.workflow.findUnique({
+      where: { id },
+    });
+
+    if (!workflow) {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: `Workflow ${id} not found`,
+      });
+    }
+
+    if (!workflow.triggerConfig) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Workflow has no trigger configuration',
+      });
+    }
+
+    // Parse triggerConfig with Zod for runtime safety
+    const config = triggerConfigSchema.parse(workflow.triggerConfig);
+
+    // Evaluate the trigger condition
+    const { triggered, details } = this.triggerEvaluation.evaluate(config, metricValue);
+
+    // Render output message
+    const metricName = config.type === 'THRESHOLD' ? config.metric : 'metric';
+    const message = workflow.outputMessage
+      ? this.triggerEvaluation.renderMessage(workflow.outputMessage, metricName, metricValue)
+      : `Trigger evaluation: ${details}`;
+
+    // If triggered and not a dry run, create the event
+    if (triggered && !dryRun) {
+      try {
+        await this.eventsService.trigger(
+          {
+            workflowId: id,
+            title: message,
+            payload: { metricValue, details, simulatedBy: userId },
+          },
+          userId,
+        );
+      } catch (error) {
+        // Handle CONFLICT (duplicate open event) gracefully
+        if (error instanceof TRPCError && error.code === 'CONFLICT') {
+          return { triggered, message, details, dryRun, alreadyOpen: true };
+        }
+        throw error;
+      }
+    }
+
+    return { triggered, message, details, dryRun };
   }
 
   private async ensureExists(id: string) {

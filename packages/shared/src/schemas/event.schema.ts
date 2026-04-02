@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+export const eventActionSchema = z.enum(['CREATED', 'TRIGGERED', 'RESOLVED', 'SNOOZED', 'REOPENED']);
+export type EventAction = z.infer<typeof eventActionSchema>;
+
 export const triggerEventSchema = z.object({
   title: z.string().min(3).max(200),
   payload: z.record(z.unknown()).default({}),

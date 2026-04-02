@@ -10,6 +10,7 @@ import {
   createWorkflowSchema,
   updateWorkflowSchema,
   workflowIdSchema,
+  simulateWorkflowSchema,
   triggerEventSchema,
   snoozeEventSchema,
   addCommentSchema,
@@ -37,6 +38,7 @@ const workflowsRouter = t.router({
     .mutation(() => null as any),
   toggleActive: t.procedure.input(workflowIdSchema).mutation(() => null as any),
   delete: t.procedure.input(workflowIdSchema).mutation(() => null as any),
+  simulate: t.procedure.input(simulateWorkflowSchema).mutation(() => null as any),
 });
 
 const eventsRouter = t.router({
