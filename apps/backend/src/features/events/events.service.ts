@@ -3,7 +3,8 @@ import { TRPCError } from '@trpc/server';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { ResendEmailService } from '../resend/services/resend-email.service';
+import { MailerService } from '../mailer/services/mailer.service';
+import { eventTriggeredTemplate } from '../mailer/templates';
 import {
   recipientSchema,
   type TriggerEventInput,
@@ -21,7 +22,7 @@ export class EventsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
-    private readonly resendEmailService: ResendEmailService,
+    private readonly mailerService: MailerService,
   ) {}
 
   async findAll(pagination: PaginationInput, filters?: EventFilterInput) {
@@ -144,6 +145,10 @@ export class EventsService {
       return created;
     });
 
+    // Parse recipients from workflow
+    const parsed = z.array(recipientSchema).safeParse(workflow.recipients ?? []);
+    const recipients = parsed.success ? parsed.data : [];
+
     // Notify via SSE after successful transaction (backward-compatible)
     this.notificationsService.notify(userId, 'event.triggered', {
       eventId: event.id,
@@ -151,27 +156,41 @@ export class EventsService {
       workflowId: event.workflowId,
     });
 
-    // Create in-app notification for workflow owner
-    await this.notificationsService.send({
-      userId: workflow.userId,
-      type: 'EVENT_TRIGGERED',
-      title: `Event triggered: ${event.title}`,
-      body: `Workflow "${workflow.name}" triggered a new event.`,
-      metadata: { eventId: event.id, workflowId: event.workflowId },
-    });
+    // Send in-app notifications to workflow owner + IN_APP recipients
+    const inAppRecipientIds = recipients
+      .filter((r) => r.channel === 'IN_APP')
+      .map((r) => r.destination);
+    const notifyUserIds = new Set([workflow.userId, ...inAppRecipientIds]);
+
+    await Promise.all(
+      [...notifyUserIds].map((uid) =>
+        this.notificationsService.send({
+          userId: uid,
+          type: 'EVENT_TRIGGERED',
+          title: `Event triggered: ${event.title}`,
+          body: `Workflow "${workflow.name}" triggered a new event.`,
+          metadata: { eventId: event.id, workflowId: event.workflowId },
+        }),
+      ),
+    );
 
     // Send emails to EMAIL channel recipients (fire-and-forget)
-    const parsed = z.array(recipientSchema).safeParse(workflow.recipients ?? []);
-    const recipients = parsed.success ? parsed.data : [];
     const emailRecipients = recipients.filter((r) => r.channel === 'EMAIL');
 
     if (emailRecipients.length > 0) {
+      const html = eventTriggeredTemplate({
+        eventTitle: event.title,
+        workflowName: workflow.name,
+        triggeredAt: event.createdAt,
+        payload: input.payload as Record<string, unknown> | undefined,
+      });
+
       Promise.allSettled(
         emailRecipients.map((r) =>
-          this.resendEmailService.send({
+          this.mailerService.send({
             to: r.destination,
             subject: `Alert: ${event.title}`,
-            html: `<h2>${event.title}</h2><p>Workflow "${workflow.name}" triggered a new event.</p>`,
+            html,
           }),
         ),
       ).catch((err) => {

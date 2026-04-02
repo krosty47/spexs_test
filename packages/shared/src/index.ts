@@ -102,3 +102,14 @@ export {
 
 // Pagination schemas
 export { paginationSchema, type PaginationInput } from './schemas/pagination.schema';
+
+// Config schemas
+export { appConfigOutputSchema, type AppConfigOutput } from './schemas/config.schema';
+
+// User schemas
+export {
+  userListItemSchema,
+  userListOutputSchema,
+  type UserListItem,
+  type UserListOutput,
+} from './schemas/user.schema';

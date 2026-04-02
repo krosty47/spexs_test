@@ -9,8 +9,10 @@ import { AuthModule } from './features/auth/auth.module';
 import { WorkflowsModule } from './features/workflows/workflows.module';
 import { EventsModule } from './features/events/events.module';
 import { NotificationsModule } from './features/notifications/notifications.module';
-import { ResendModule } from './features/resend';
+import { MailerModule } from './features/mailer';
 import { DailySummaryModule } from './features/daily-summary/daily-summary.module';
+import { ConfigFeatureModule } from './features/config/config.module';
+import { UsersModule } from './features/users/users.module';
 
 @Module({
   imports: [
@@ -26,16 +28,22 @@ import { DailySummaryModule } from './features/daily-summary/daily-summary.modul
     WorkflowsModule,
     EventsModule,
     NotificationsModule,
-    ResendModule.forRootAsync({
+    MailerModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
-        apiKey: configService.get<string>('RESEND_API_KEY'),
-        defaultFrom: configService.get<string>('RESEND_FROM'),
+        host: configService.get<string>('SMTP_HOST'),
+        port: configService.get<number>('SMTP_PORT'),
+        secure: configService.get<boolean>('SMTP_SECURE'),
+        user: configService.get<string>('SMTP_USER'),
+        pass: configService.get<string>('SMTP_PASS'),
+        defaultFrom: configService.get<string>('SMTP_FROM'),
       }),
       inject: [ConfigService],
       isGlobal: true,
     }),
     DailySummaryModule,
+    ConfigFeatureModule,
+    UsersModule,
   ],
 })
 export class AppModule {}
