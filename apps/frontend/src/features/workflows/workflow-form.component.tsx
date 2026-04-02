@@ -10,14 +10,22 @@ import { Trash2 } from 'lucide-react';
 import { useWorkflowForm, type WorkflowFormData } from './use-workflow-form.hook';
 
 const TRIGGER_OPERATORS = ['>', '<', '>=', '<=', '==', '!='] as const;
-const METRIC_SUGGESTIONS = ['cpu_usage', 'memory_usage', 'disk_usage', 'network_latency', 'error_rate'] as const;
+const METRIC_SUGGESTIONS = [
+  'cpu_usage',
+  'memory_usage',
+  'disk_usage',
+  'network_latency',
+  'error_rate',
+] as const;
 
 interface WorkflowFormProps {
   initialData?: WorkflowFormData;
 }
 
 export function WorkflowForm({ initialData }: WorkflowFormProps = {}) {
-  const { form, recipientsField, onSubmit, isLoading, error, isEditMode } = useWorkflowForm({ initialData });
+  const { form, recipientsField, onSubmit, isLoading, error, isEditMode } = useWorkflowForm({
+    initialData,
+  });
   const {
     register,
     watch,
@@ -255,8 +263,12 @@ export function WorkflowForm({ initialData }: WorkflowFormProps = {}) {
         <CardFooter>
           <Button type="submit" disabled={isLoading}>
             {isLoading
-              ? isEditMode ? 'Saving...' : 'Creating...'
-              : isEditMode ? 'Save Changes' : 'Create Workflow'}
+              ? isEditMode
+                ? 'Saving...'
+                : 'Creating...'
+              : isEditMode
+                ? 'Save Changes'
+                : 'Create Workflow'}
           </Button>
         </CardFooter>
       </form>

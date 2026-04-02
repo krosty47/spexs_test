@@ -73,6 +73,8 @@ This starts both apps concurrently via Turborepo:
 | Frontend | http://localhost:3000 |
 | Backend  | http://localhost:4000 |
 
+The notification bell in the top-right header shows real-time alerts via SSE. Click it to view, mark as read, or navigate to event details.
+
 ### 6. Log in
 
 Use one of the seeded accounts:

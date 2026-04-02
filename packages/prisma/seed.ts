@@ -1,4 +1,4 @@
-import { PrismaClient, Role, EventStatus, TriggerType } from '@prisma/client';
+import { PrismaClient, Role, EventStatus, TriggerType, NotificationType } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -274,6 +274,63 @@ async function main() {
       reason: 'Known issue, maintenance window scheduled',
       eventId: event4.id,
       userId: regularUser.id,
+    },
+  });
+
+  // Seed notifications
+  await prisma.notification.upsert({
+    where: { id: 'seed-notif-1' },
+    update: {},
+    create: {
+      id: 'seed-notif-1',
+      type: NotificationType.EVENT_TRIGGERED,
+      title: 'Event triggered: High CPU on server-01',
+      body: 'Workflow "CPU Usage Alert" triggered a new event.',
+      isRead: false,
+      metadata: { eventId: 'seed-event-1', workflowId: 'seed-workflow-1' },
+      userId: adminUser.id,
+    },
+  });
+
+  await prisma.notification.upsert({
+    where: { id: 'seed-notif-2' },
+    update: {},
+    create: {
+      id: 'seed-notif-2',
+      type: NotificationType.EVENT_RESOLVED,
+      title: 'Event resolved: High CPU on server-02',
+      body: 'Event "High CPU on server-02" has been resolved.',
+      isRead: true,
+      metadata: { eventId: 'seed-event-2', workflowId: 'seed-workflow-1' },
+      userId: adminUser.id,
+    },
+  });
+
+  await prisma.notification.upsert({
+    where: { id: 'seed-notif-3' },
+    update: {},
+    create: {
+      id: 'seed-notif-3',
+      type: NotificationType.EVENT_SNOOZED,
+      title: 'Event snoozed: Memory warning on cache-01',
+      body: 'Event "Memory warning on cache-01" has been snoozed for 24 hours.',
+      isRead: false,
+      metadata: { eventId: 'seed-event-3', workflowId: 'seed-workflow-2' },
+      userId: regularUser.id,
+    },
+  });
+
+  await prisma.notification.upsert({
+    where: { id: 'seed-notif-4' },
+    update: {},
+    create: {
+      id: 'seed-notif-4',
+      type: NotificationType.EVENT_TRIGGERED,
+      title: 'Event triggered: Memory spike on db-primary',
+      body: 'Workflow "Memory Threshold" triggered a new event.',
+      isRead: false,
+      metadata: { eventId: 'seed-event-3', workflowId: 'seed-workflow-2' },
+      userId: adminUser.id,
     },
   });
 

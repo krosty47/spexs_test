@@ -265,6 +265,7 @@ export const createContext = (req: FastifyRequest) => ({
 - **EventHistory** - Audit log of event state changes (action: `EventAction` enum — CREATED, TRIGGERED, RESOLVED, SNOOZED, REOPENED)
 - **Comment** - User comments on events
 - **Snooze** - Snooze configuration per event
+- **Notification** - In-app notifications (type: `NotificationType` enum — EVENT_TRIGGERED, EVENT_RESOLVED, EVENT_SNOOZED, EVENT_REOPENED). Composite index on `[userId, isRead]` for efficient filtered queries.
 - **User** - Application users with roles
 
 ### Prisma Conventions
@@ -317,26 +318,31 @@ export const createContext = (req: FastifyRequest) => ({
 
 ### Approach
 
-WebSocket (via `@nestjs/websockets` + Fastify WebSocket adapter) for pushing live updates to connected clients.
+Server-Sent Events (SSE) for pushing live notifications to connected clients. User-scoped streams ensure each user only receives their own events.
 
 ### Use Cases
 
-- New alert triggered → push to dashboard
-- Event resolved/snoozed → update all connected clients viewing that event
-- Notification delivery → instant in-app notification
+- New alert triggered → push notification to workflow owner
+- Event resolved/snoozed → update connected clients
+- Notification delivery → instant in-app notification with bell badge update
 
 ### Architecture
 
 ```
-┌──────────┐  subscribe   ┌──────────────┐  emit    ┌──────────┐
-│  Client  │ ◄──────────► │  WS Gateway  │ ◄─────── │ Services │
-│ (Next.js)│              │  (NestJS)    │          │          │
-└──────────┘              └──────────────┘          └──────────┘
+┌──────────┐  EventSource  ┌──────────────────┐  notify()  ┌──────────┐
+│  Client  │ ◄──────────── │ SSE Controller   │ ◄───────── │ Services │
+│ (Next.js)│   (per-user)  │ /notifications/  │            │          │
+│          │               │ sse              │            │          │
+└──────────┘               └──────────────────┘            └──────────┘
 ```
 
-- Gateway handles connection lifecycle and room-based subscriptions
-- Services emit events through the gateway after mutations
-- Frontend uses a custom hook (`useWebSocket`) to subscribe and update UI
+- `NotificationsService` maintains a `Map<userId, Subject<MessageEvent>[]>` for user-scoped streams
+- SSE controller protected by `JwtCookieGuard` (extracts userId from httpOnly JWT cookie)
+- Multiple tabs supported: each connection gets its own Subject, cleaned up on disconnect
+- Native `EventSource` auto-reconnection (~3s) — no custom retry logic needed
+- Frontend uses a two-layer hook architecture:
+  - `useSSE` — generic, SSR-safe, reusable for any SSE endpoint
+  - `useNotifications` — wraps `useSSE`, invalidates tRPC notification queries on each message
 
 ---
 
@@ -344,15 +350,23 @@ WebSocket (via `@nestjs/websockets` + Fastify WebSocket adapter) for pushing liv
 
 ### Channels
 
-1. **In-app** - Real-time via WebSocket, persisted in database for history
-2. **Email** - Via Resend (or similar provider) through independent module
+1. **In-app** - Real-time via SSE, persisted in `Notification` model for history
+2. **Email** - Via Resend through independent module (`features/resend/`), fire-and-forget with `Promise.allSettled`
 
 ### Architecture
 
-- `NotificationsService` orchestrates channel delivery
-- Each channel is an independent module (`modules/resend/`)
-- Strategy pattern for adding new channels without modifying existing code
-- Notification preferences per user (which channels, which event types)
+- `NotificationsService.send()` — single public facade that persists notification to DB + pushes SSE event
+- `NotificationsService.notify()` — low-level SSE push (synchronous, no DB write)
+- tRPC router exposes `list` (paginated, with `unreadOnly` filter), `unreadCount`, `markAsRead` (with ownership validation), `markAllAsRead`
+- `markAsRead` uses optimized single `updateMany` query with FORBIDDEN/NOT_FOUND fallback
+- `EventsService.trigger()` calls `NotificationsService.send()` for workflow owner and dispatches emails to EMAIL-channel recipients
+- Notification metadata is typed via `notificationMetadataSchema` (`{ eventId, workflowId }`) at both Zod and application layer
+
+### Frontend
+
+- `NotificationBell` — Radix UI Popover with bell icon + red unread badge
+- `NotificationDropdown` — scrollable list with relative timestamps, blue unread dots, mark-as-read on click, mark-all-as-read button
+- Smart polling fallback: polls every 30s only when SSE is disconnected (`refetchInterval: isConnected ? false : 30_000`)
 
 ---
 
@@ -405,7 +419,7 @@ WebSocket (via `@nestjs/websockets` + Fastify WebSocket adapter) for pushing liv
 | Local UI state | `useState`                                        | Modal open/close, form inputs |
 | Global client  | Zustand (if needed)                               | Theme, sidebar collapsed      |
 | URL state      | Next.js searchParams                              | Filters, pagination           |
-| Real-time      | WebSocket subscription + React Query invalidation | Live alerts                   |
+| Real-time      | SSE subscription + React Query invalidation       | Live notifications            |
 
 ### Key Rule
 

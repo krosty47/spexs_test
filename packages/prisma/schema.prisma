@@ -33,6 +33,13 @@ enum EventAction {
   REOPENED
 }
 
+enum NotificationType {
+  EVENT_TRIGGERED
+  EVENT_RESOLVED
+  EVENT_SNOOZED
+  EVENT_REOPENED
+}
+
 // --- Models ---
 
 model User {
@@ -44,11 +51,12 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  workflows    Workflow[]
-  comments     Comment[]
-  snoozes      Snooze[]
-  eventHistory EventHistory[]
+  workflows      Workflow[]
+  comments       Comment[]
+  snoozes        Snooze[]
+  eventHistory   EventHistory[]
   resolvedEvents Event[] @relation("ResolvedByUser")
+  notifications  Notification[]
 
   @@map("users")
 }
@@ -141,4 +149,21 @@ model Snooze {
 
   @@index([until])
   @@map("snoozes")
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  type      NotificationType
+  title     String
+  body      String
+  isRead    Boolean          @default(false) @map("is_read")
+  metadata  Json?
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @updatedAt @map("updated_at")
+  userId    String           @map("user_id")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, isRead])
+  @@map("notifications")
 }

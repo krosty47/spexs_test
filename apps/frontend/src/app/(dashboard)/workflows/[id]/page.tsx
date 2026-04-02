@@ -26,7 +26,6 @@ import { ArrowLeft, MoreVertical, Pencil, Power, PowerOff, Trash2, X } from 'luc
 import Link from 'next/link';
 import { SimulateTrigger } from '@/features/workflows/simulate-trigger.component';
 import { WorkflowForm } from '@/features/workflows/workflow-form.component';
-import type { WorkflowFormData } from '@/features/workflows/use-workflow-form.hook';
 import { triggerConfigSchema, recipientSchema } from '@workflow-manager/shared';
 import { z } from 'zod';
 
@@ -90,11 +89,7 @@ export default function WorkflowDetailPage() {
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsEditing(!isEditing)}
-          >
+          <Button variant="outline" size="sm" onClick={() => setIsEditing(!isEditing)}>
             {isEditing ? (
               <>
                 <X className="mr-1.5 h-4 w-4" />
@@ -150,77 +145,80 @@ export default function WorkflowDetailPage() {
             triggerType: validTriggerConfig?.type,
             triggerConfig: validTriggerConfig,
             outputMessage: workflow.outputMessage,
-            recipients: z.array(recipientSchema).catch([]).parse(workflow.recipients ?? []),
+            recipients: z
+              .array(recipientSchema)
+              .catch([])
+              .parse(workflow.recipients ?? []),
           }}
         />
       ) : (
-      <>
-      {/* Trigger Config Summary */}
-      {hasTriggerConfig && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Trigger Configuration</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <pre className="overflow-x-auto rounded-md bg-[var(--muted)] p-4 text-sm">
-              {JSON.stringify(workflow.triggerConfig, null, 2)}
-            </pre>
-            {workflow.outputMessage && (
-              <p className="mt-2 text-sm">
-                <span className="font-medium">Message template:</span> {workflow.outputMessage}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Simulate Trigger */}
-      {hasTriggerConfig && <SimulateTrigger workflowId={workflow.id} />}
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Events</CardTitle>
-          <CardDescription>{workflow._count?.events ?? 0} total events</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {workflow.events && workflow.events.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Title</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {workflow.events.map(
-                  (event: {
-                    id: string;
-                    title: string;
-                    status: string;
-                    createdAt: string | Date;
-                  }) => (
-                    <TableRow key={event.id}>
-                      <TableCell>
-                        <Link href={`/events/${event.id}`} className="hover:underline">
-                          {event.title}
-                        </Link>
-                      </TableCell>
-                      <TableCell>
-                        <StatusBadge status={event.status} />
-                      </TableCell>
-                      <TableCell>{new Date(event.createdAt).toLocaleDateString()}</TableCell>
-                    </TableRow>
-                  ),
+        <>
+          {/* Trigger Config Summary */}
+          {hasTriggerConfig && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Trigger Configuration</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <pre className="overflow-x-auto rounded-md bg-[var(--muted)] p-4 text-sm">
+                  {JSON.stringify(workflow.triggerConfig, null, 2)}
+                </pre>
+                {workflow.outputMessage && (
+                  <p className="mt-2 text-sm">
+                    <span className="font-medium">Message template:</span> {workflow.outputMessage}
+                  </p>
                 )}
-              </TableBody>
-            </Table>
-          ) : (
-            <p className="text-[var(--muted-foreground)]">No events yet</p>
+              </CardContent>
+            </Card>
           )}
-        </CardContent>
-      </Card>
-      </>
+
+          {/* Simulate Trigger */}
+          {hasTriggerConfig && <SimulateTrigger workflowId={workflow.id} />}
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Events</CardTitle>
+              <CardDescription>{workflow._count?.events ?? 0} total events</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {workflow.events && workflow.events.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Title</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Created</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {workflow.events.map(
+                      (event: {
+                        id: string;
+                        title: string;
+                        status: string;
+                        createdAt: string | Date;
+                      }) => (
+                        <TableRow key={event.id}>
+                          <TableCell>
+                            <Link href={`/events/${event.id}`} className="hover:underline">
+                              {event.title}
+                            </Link>
+                          </TableCell>
+                          <TableCell>
+                            <StatusBadge status={event.status} />
+                          </TableCell>
+                          <TableCell>{new Date(event.createdAt).toLocaleDateString()}</TableCell>
+                        </TableRow>
+                      ),
+                    )}
+                  </TableBody>
+                </Table>
+              ) : (
+                <p className="text-[var(--muted-foreground)]">No events yet</p>
+              )}
+            </CardContent>
+          </Card>
+        </>
       )}
     </div>
   );

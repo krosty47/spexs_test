@@ -49,5 +49,21 @@ export {
   type EventFilterInput,
 } from './schemas/event.schema';
 
+// Notification schemas
+export {
+  notificationTypeSchema,
+  notificationMetadataSchema,
+  notificationSchema,
+  markNotificationReadSchema,
+  notificationListSchema,
+  unreadCountOutputSchema,
+  type NotificationType,
+  type NotificationMetadata,
+  type Notification,
+  type MarkNotificationReadInput,
+  type NotificationListInput,
+  type UnreadCountOutput,
+} from './schemas/notification.schema';
+
 // Pagination schemas
 export { paginationSchema, type PaginationInput } from './schemas/pagination.schema';

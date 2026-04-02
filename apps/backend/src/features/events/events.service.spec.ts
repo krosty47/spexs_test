@@ -4,6 +4,7 @@ import { type PrismaClient } from '@prisma/client';
 import { EventsService } from './events.service';
 import { PrismaService } from '../../database/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ResendEmailService } from '../resend/services/resend-email.service';
 
 const mockEvent = {
   id: 'evt-1',
@@ -33,6 +34,13 @@ const mockWorkflow = {
   createdAt: new Date(),
   updatedAt: new Date(),
   userId: 'user-1',
+  recipients: [
+    { channel: 'EMAIL', destination: 'alert@example.com' },
+    { channel: 'IN_APP', destination: 'user@example.com' },
+  ],
+  triggerType: null,
+  triggerConfig: null,
+  outputMessage: null,
 };
 
 function createTxMock() {
@@ -51,19 +59,56 @@ function setupTransaction(
   );
 }
 
+function setupTriggerMocks(
+  prisma: DeepMockProxy<PrismaClient>,
+  overrides: {
+    workflow?: typeof mockWorkflow;
+    historyUserId?: string;
+    findFirstResult?: typeof mockEvent | null;
+  } = {},
+) {
+  const {
+    workflow = mockWorkflow,
+    historyUserId = 'system',
+    findFirstResult = null,
+  } = overrides;
+
+  const txMock = createTxMock();
+  txMock.event.findFirst.mockResolvedValue(findFirstResult);
+  txMock.event.create.mockResolvedValue(mockEvent);
+  txMock.eventHistory.create.mockResolvedValue({
+    id: 'hist-1',
+    action: 'TRIGGERED',
+    createdAt: new Date(),
+    eventId: 'evt-1',
+    userId: historyUserId,
+  });
+
+  prisma.workflow.findUnique.mockResolvedValue(workflow);
+  setupTransaction(prisma, txMock);
+
+  return txMock;
+}
+
 describe('EventsService', () => {
   let service: EventsService;
   let prisma: DeepMockProxy<PrismaClient>;
-  let notificationsService: { notify: jest.Mock };
+  let notificationsService: { notify: jest.Mock; send: jest.Mock };
+  let resendEmailService: { send: jest.Mock };
 
   beforeEach(async () => {
-    notificationsService = { notify: jest.fn().mockResolvedValue(undefined) };
+    notificationsService = {
+      notify: jest.fn().mockResolvedValue(undefined),
+      send: jest.fn().mockResolvedValue(undefined),
+    };
+    resendEmailService = { send: jest.fn().mockResolvedValue({ id: 'email-1' }) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EventsService,
         { provide: PrismaService, useValue: mockDeep<PrismaClient>() },
         { provide: NotificationsService, useValue: notificationsService },
+        { provide: ResendEmailService, useValue: resendEmailService },
       ],
     }).compile();
 
@@ -111,19 +156,7 @@ describe('EventsService', () => {
 
   describe('trigger', () => {
     it('should create event with TRIGGERED history in a transaction', async () => {
-      const txMock = createTxMock();
-      txMock.event.findFirst.mockResolvedValue(null);
-      txMock.event.create.mockResolvedValue(mockEvent);
-      txMock.eventHistory.create.mockResolvedValue({
-        id: 'hist-1',
-        action: 'TRIGGERED',
-        createdAt: new Date(),
-        eventId: 'evt-1',
-        userId: 'system',
-      });
-
-      prisma.workflow.findUnique.mockResolvedValue(mockWorkflow);
-      setupTransaction(prisma, txMock);
+      const txMock = setupTriggerMocks(prisma);
 
       const result = await service.trigger({
         title: 'Test Event',
@@ -165,19 +198,7 @@ describe('EventsService', () => {
     });
 
     it('should call NotificationsService.notify after creation', async () => {
-      const txMock = createTxMock();
-      txMock.event.findFirst.mockResolvedValue(null);
-      txMock.event.create.mockResolvedValue(mockEvent);
-      txMock.eventHistory.create.mockResolvedValue({
-        id: 'hist-1',
-        action: 'TRIGGERED',
-        createdAt: new Date(),
-        eventId: 'evt-1',
-        userId: 'system',
-      });
-
-      prisma.workflow.findUnique.mockResolvedValue(mockWorkflow);
-      setupTransaction(prisma, txMock);
+      setupTriggerMocks(prisma);
 
       await service.trigger({
         title: 'Test Event',
@@ -193,19 +214,7 @@ describe('EventsService', () => {
     });
 
     it('should use triggeredBy userId when provided', async () => {
-      const txMock = createTxMock();
-      txMock.event.findFirst.mockResolvedValue(null);
-      txMock.event.create.mockResolvedValue(mockEvent);
-      txMock.eventHistory.create.mockResolvedValue({
-        id: 'hist-1',
-        action: 'TRIGGERED',
-        createdAt: new Date(),
-        eventId: 'evt-1',
-        userId: 'user-1',
-      });
-
-      prisma.workflow.findUnique.mockResolvedValue(mockWorkflow);
-      setupTransaction(prisma, txMock);
+      const txMock = setupTriggerMocks(prisma, { historyUserId: 'user-1' });
 
       await service.trigger({ title: 'Test Event', payload: {}, workflowId: 'wf-1' }, 'user-1');
 
@@ -222,11 +231,7 @@ describe('EventsService', () => {
     });
 
     it('should reject duplicate open events for same workflow', async () => {
-      const txMock = createTxMock();
-      txMock.event.findFirst.mockResolvedValue(mockEvent);
-
-      prisma.workflow.findUnique.mockResolvedValue(mockWorkflow);
-      setupTransaction(prisma, txMock);
+      setupTriggerMocks(prisma, { findFirstResult: mockEvent });
 
       await expect(
         service.trigger({
@@ -235,6 +240,92 @@ describe('EventsService', () => {
           workflowId: 'wf-1',
         }),
       ).rejects.toMatchObject({ code: 'CONFLICT' });
+    });
+
+    it('should send email to EMAIL channel recipients (fire-and-forget)', async () => {
+      setupTriggerMocks(prisma);
+
+      await service.trigger({
+        title: 'Test Event',
+        payload: { key: 'value' },
+        workflowId: 'wf-1',
+      });
+
+      expect(resendEmailService.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: 'alert@example.com',
+          subject: expect.stringContaining('Test Event'),
+        }),
+      );
+    });
+
+    it('should NOT block on email failure', async () => {
+      resendEmailService.send.mockRejectedValue(new Error('Email API down'));
+
+      setupTriggerMocks(prisma);
+
+      // Should not throw even though email fails
+      const result = await service.trigger({
+        title: 'Test Event',
+        payload: {},
+        workflowId: 'wf-1',
+      });
+
+      expect(result).toBeDefined();
+      expect(result.id).toBe('evt-1');
+    });
+
+    it('should create in-app notification for workflow owner', async () => {
+      setupTriggerMocks(prisma);
+
+      await service.trigger({
+        title: 'Test Event',
+        payload: {},
+        workflowId: 'wf-1',
+      });
+
+      expect(notificationsService.send).toHaveBeenCalledWith({
+        userId: 'user-1',
+        type: 'EVENT_TRIGGERED',
+        title: expect.stringContaining('Test Event'),
+        body: expect.any(String),
+        metadata: { eventId: 'evt-1', workflowId: 'wf-1' },
+      });
+    });
+
+    it('should handle workflow with no recipients gracefully', async () => {
+      const workflowNoRecipients = { ...mockWorkflow, recipients: [] };
+
+      setupTriggerMocks(prisma, { workflow: workflowNoRecipients });
+
+      const result = await service.trigger({
+        title: 'Test Event',
+        payload: {},
+        workflowId: 'wf-1',
+      });
+
+      expect(result).toBeDefined();
+      // No emails sent when no recipients
+      expect(resendEmailService.send).not.toHaveBeenCalled();
+      // In-app notification still created for workflow owner
+      expect(notificationsService.send).toHaveBeenCalled();
+    });
+
+    it('should not send email when no EMAIL recipients exist', async () => {
+      const workflowInAppOnly = {
+        ...mockWorkflow,
+        recipients: [{ channel: 'IN_APP', destination: 'user@example.com' }],
+      };
+
+      setupTriggerMocks(prisma, { workflow: workflowInAppOnly });
+
+      await service.trigger({
+        title: 'Test Event',
+        payload: {},
+        workflowId: 'wf-1',
+      });
+
+      expect(resendEmailService.send).not.toHaveBeenCalled();
     });
   });
 

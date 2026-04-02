@@ -50,10 +50,7 @@ export function SimulateTrigger({ workflowId }: SimulateTriggerProps) {
             />
             <span className="text-sm">Dry Run</span>
           </label>
-          <Button
-            onClick={handleSimulate}
-            disabled={!metricValue || simulateMutation.isPending}
-          >
+          <Button onClick={handleSimulate} disabled={!metricValue || simulateMutation.isPending}>
             {simulateMutation.isPending ? 'Simulating...' : 'Simulate'}
           </Button>
         </div>
@@ -62,17 +59,11 @@ export function SimulateTrigger({ workflowId }: SimulateTriggerProps) {
           <div className="rounded-md border p-4 space-y-2">
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium">Result:</span>
-              <Badge
-                variant={simulateMutation.data.triggered ? 'destructive' : 'secondary'}
-              >
+              <Badge variant={simulateMutation.data.triggered ? 'destructive' : 'secondary'}>
                 {simulateMutation.data.triggered ? 'Triggered' : 'Not Triggered'}
               </Badge>
-              {simulateMutation.data.dryRun && (
-                <Badge variant="outline">Dry Run</Badge>
-              )}
-              {simulateMutation.data.alreadyOpen && (
-                <Badge variant="secondary">Already Open</Badge>
-              )}
+              {simulateMutation.data.dryRun && <Badge variant="outline">Dry Run</Badge>}
+              {simulateMutation.data.alreadyOpen && <Badge variant="secondary">Already Open</Badge>}
             </div>
             <p className="text-sm">{simulateMutation.data.message}</p>
             <p className="text-xs text-[var(--muted-foreground)]">
@@ -82,9 +73,7 @@ export function SimulateTrigger({ workflowId }: SimulateTriggerProps) {
         )}
 
         {simulateMutation.error && (
-          <p className="text-sm text-[var(--destructive)]">
-            {simulateMutation.error.message}
-          </p>
+          <p className="text-sm text-[var(--destructive)]">{simulateMutation.error.message}</p>
         )}
       </CardContent>
     </Card>

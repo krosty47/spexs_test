@@ -23,6 +23,6 @@ import { TrpcModule } from '../../trpc/trpc.module';
     }),
   ],
   providers: [AuthService, AuthRouter, JwtStrategy],
-  exports: [AuthService, AuthRouter],
+  exports: [AuthService, AuthRouter, JwtModule],
 })
 export class AuthModule {}
