@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { trpc, getTrpcClient } from './trpc';
 
 interface TrpcProviderProps {
@@ -16,6 +17,11 @@ export function TrpcProvider({ children }: TrpcProviderProps) {
           queries: {
             staleTime: 5 * 60 * 1000,
             refetchOnWindowFocus: false,
+          },
+          mutations: {
+            onError: (error) => {
+              toast.error(error.message || 'An unexpected error occurred');
+            },
           },
         },
       }),

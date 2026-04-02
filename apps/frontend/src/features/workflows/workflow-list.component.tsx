@@ -2,7 +2,6 @@
 
 import { trpc } from '@/lib/trpc';
 import { WorkflowCard } from './workflow-card.component';
-import type { Workflow } from './workflow.types';
 
 export function WorkflowList() {
   const utils = trpc.useUtils();
@@ -27,7 +26,7 @@ export function WorkflowList() {
     return <p className="text-[var(--destructive)]">Error: {workflowsQuery.error.message}</p>;
   }
 
-  const workflows: Workflow[] = workflowsQuery.data?.data ?? [];
+  const workflows = workflowsQuery.data?.data ?? [];
 
   if (workflows.length === 0) {
     return (

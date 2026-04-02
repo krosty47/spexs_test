@@ -12,10 +12,10 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { MoreVertical, Power, PowerOff, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import type { Workflow } from './workflow.types';
+import type { WorkflowListItem } from '@/lib/trpc-types';
 
 interface WorkflowCardProps {
-  workflow: Workflow;
+  workflow: WorkflowListItem;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
 }

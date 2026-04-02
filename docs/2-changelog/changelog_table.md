@@ -1,14 +1,26 @@
 # Changelog Table
 
-| Version | Week | Commit Message                                                                                      |
-| ------- | ---- | --------------------------------------------------------------------------------------------------- |
-| `0.4.0` | 1    | feat: notifications system v0.4.0 - in-app notifications, SSE real-time delivery, email on trigger  |
-| `0.3.0` | 1    | feat: core domain model refinements, auth hardening, code review fixes                              |
-| `0.2.0` | 1    | feat: event trigger enhancements, snooze expiration cron, frontend pagination |
-| `0.1.0` | 1    | chore: initialize TRIP workflow                                               |
+| Version | Week | Commit Message                                                                                     |
+| ------- | ---- | -------------------------------------------------------------------------------------------------- |
+| `0.5.0` | 1    | feat: end-to-end type safety improvements and error handling hardening                             |
+| `0.4.0` | 1    | feat: notifications system v0.4.0 - in-app notifications, SSE real-time delivery, email on trigger |
+| `0.3.0` | 1    | feat: core domain model refinements, auth hardening, code review fixes                             |
+| `0.2.0` | 1    | feat: event trigger enhancements, snooze expiration cron, frontend pagination                      |
+| `0.1.0` | 1    | chore: initialize TRIP workflow                                                                    |
 
 # Changelog Summary
 
+- **v0.5.0 (Type Safety & Error Handling - Week 1, 02-04-2026)**:
+  - **Shared**: Zod output schemas for all 21 tRPC procedures (workflows, events, auth, notifications)
+  - **Shared**: Split workflowOutputSchema into strict base + workflowWithCountSchema + workflowDetailOutputSchema
+  - **Shared**: z.record(z.unknown()) for payload fields, z.coerce.date() for all date fields
+  - **Backend**: `output` field on all @Query/@Mutation decorators for runtime output validation
+  - **Backend**: ResendEmailService throws TRPCError instead of generic Error, removed unsafe type cast on recipients
+  - **Backend**: Updated @generated/index.ts placeholder with output schemas for frontend type inference
+  - **Frontend**: inferRouterOutputs<AppRouter> utility (trpc-types.ts), deleted manual workflow.types.ts
+  - **Frontend**: ErrorBoundary component with retry, Toaster (sonner) with global tRPC onError handler
+  - **Frontend**: Dashboard layout wrapped with ErrorBoundary + Toaster
+  - **Tests**: 127 backend tests pass (20 output schema + 4 resend error + 4 ErrorBoundary tests added)
 - **v0.4.0 (Notifications System - Week 1, 02-04-2026)**:
   - **Backend**: Notification model + NotificationType enum, user-scoped SSE via Map<userId, Subject[]>, NotificationsService.send() facade (persist + SSE)
   - **Backend**: tRPC notifications router (list, unreadCount, markAsRead, markAllAsRead), JwtCookieGuard extracted to auth feature

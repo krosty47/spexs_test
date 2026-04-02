@@ -75,9 +75,7 @@ describe('DailySummaryService', () => {
       prisma.event.groupBy.mockResolvedValue([
         { workflowId: 'wf-1', status: 'OPEN', _count: { id: 1 } },
       ]);
-      prisma.workflow.findMany.mockResolvedValue([
-        { id: 'wf-1', name: 'CPU Alert' },
-      ]);
+      prisma.workflow.findMany.mockResolvedValue([{ id: 'wf-1', name: 'CPU Alert' }]);
 
       resendEmailService.send.mockRejectedValue(new Error('Resend API error'));
 
@@ -101,9 +99,7 @@ describe('DailySummaryService', () => {
       prisma.event.groupBy.mockResolvedValue([
         { workflowId: 'wf-1', status: 'OPEN', _count: { id: 5 } },
       ]);
-      prisma.workflow.findMany.mockResolvedValue([
-        { id: 'wf-1', name: 'Test Workflow' },
-      ]);
+      prisma.workflow.findMany.mockResolvedValue([{ id: 'wf-1', name: 'Test Workflow' }]);
 
       await service.generateSummary();
 
@@ -120,9 +116,7 @@ describe('DailySummaryService', () => {
       prisma.event.groupBy.mockResolvedValue([
         { workflowId: 'wf-1', status: 'OPEN', _count: { id: 5 } },
       ]);
-      prisma.workflow.findMany.mockResolvedValue([
-        { id: 'wf-1', name: 'Test Workflow' },
-      ]);
+      prisma.workflow.findMany.mockResolvedValue([{ id: 'wf-1', name: 'Test Workflow' }]);
 
       await service.generateSummary();
 

@@ -24,9 +24,12 @@ export class JwtCookieGuard implements CanActivate {
       const payload = this.jwtService.verify(token);
 
       if (
-        typeof payload.sub !== 'string' || !payload.sub ||
-        typeof payload.email !== 'string' || !payload.email ||
-        typeof payload.role !== 'string' || !payload.role
+        typeof payload.sub !== 'string' ||
+        !payload.sub ||
+        typeof payload.email !== 'string' ||
+        !payload.email ||
+        typeof payload.role !== 'string' ||
+        !payload.role
       ) {
         throw new UnauthorizedException('Invalid token payload');
       }

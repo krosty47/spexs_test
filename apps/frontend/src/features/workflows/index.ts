@@ -5,7 +5,12 @@ export { SimulateTrigger } from './simulate-trigger.component';
 export { useWorkflowForm } from './use-workflow-form.hook';
 export type {
   Workflow,
+  WorkflowListItem,
+  WorkflowListResponse,
+  SimulateResult,
+} from '@/lib/trpc-types';
+export type {
   CreateWorkflowInput,
   UpdateWorkflowInput,
   SimulateWorkflowResult,
-} from './workflow.types';
+} from '@workflow-manager/shared';

@@ -100,9 +100,8 @@ export class WorkflowsService {
     }
 
     if (input.recipients !== undefined) {
-      data.recipients = input.recipients === null
-        ? Prisma.DbNull
-        : (input.recipients as unknown as Prisma.InputJsonValue);
+      data.recipients =
+        input.recipients === null ? Prisma.DbNull : (input.recipients as Prisma.InputJsonValue);
     }
 
     return this.prisma.workflow.update({
@@ -123,8 +122,22 @@ export class WorkflowsService {
   async delete(id: string) {
     await this.ensureExists(id);
 
-    return this.prisma.workflow.delete({
-      where: { id },
+    return this.prisma.$transaction(async (tx) => {
+      const eventIds = (
+        await tx.event.findMany({
+          where: { workflowId: id },
+          select: { id: true },
+        })
+      ).map((e) => e.id);
+
+      if (eventIds.length > 0) {
+        await tx.comment.deleteMany({ where: { eventId: { in: eventIds } } });
+        await tx.snooze.deleteMany({ where: { eventId: { in: eventIds } } });
+        await tx.eventHistory.deleteMany({ where: { eventId: { in: eventIds } } });
+        await tx.event.deleteMany({ where: { workflowId: id } });
+      }
+
+      return tx.workflow.delete({ where: { id } });
     });
   }
 
