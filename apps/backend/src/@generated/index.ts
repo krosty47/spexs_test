@@ -32,6 +32,8 @@ import {
   unreadCountOutputSchema,
   notificationSchema,
   markAllAsReadOutputSchema,
+  appConfigOutputSchema,
+  userListOutputSchema,
 } from '@workflow-manager/shared';
 
 const t = initTRPC.create();
@@ -78,11 +80,21 @@ const notificationsRouter = t.router({
   markAllAsRead: t.procedure.output(markAllAsReadOutputSchema).mutation(() => null as any),
 });
 
+const configRouter = t.router({
+  getFeatures: t.procedure.output(appConfigOutputSchema).query(() => null as any),
+});
+
+const usersRouter = t.router({
+  list: t.procedure.output(userListOutputSchema).query(() => null as any),
+});
+
 const appRouter = t.router({
   auth: authRouter,
   workflows: workflowsRouter,
   events: eventsRouter,
   notifications: notificationsRouter,
+  config: configRouter,
+  users: usersRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -4,7 +4,7 @@ import { type PrismaClient } from '@prisma/client';
 import { EventsService } from './events.service';
 import { PrismaService } from '../../database/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { ResendEmailService } from '../resend/services/resend-email.service';
+import { MailerService } from '../mailer/services/mailer.service';
 
 const mockEvent = {
   id: 'evt-1',
@@ -36,7 +36,7 @@ const mockWorkflow = {
   userId: 'user-1',
   recipients: [
     { channel: 'EMAIL', destination: 'alert@example.com' },
-    { channel: 'IN_APP', destination: 'user@example.com' },
+    { channel: 'IN_APP', destination: 'user-2' },
   ],
   triggerType: null,
   triggerConfig: null,
@@ -90,21 +90,21 @@ describe('EventsService', () => {
   let service: EventsService;
   let prisma: DeepMockProxy<PrismaClient>;
   let notificationsService: { notify: jest.Mock; send: jest.Mock };
-  let resendEmailService: { send: jest.Mock };
+  let mailerService: { send: jest.Mock };
 
   beforeEach(async () => {
     notificationsService = {
       notify: jest.fn().mockResolvedValue(undefined),
       send: jest.fn().mockResolvedValue(undefined),
     };
-    resendEmailService = { send: jest.fn().mockResolvedValue({ id: 'email-1' }) };
+    mailerService = { send: jest.fn().mockResolvedValue({ id: 'email-1' }) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EventsService,
         { provide: PrismaService, useValue: mockDeep<PrismaClient>() },
         { provide: NotificationsService, useValue: notificationsService },
-        { provide: ResendEmailService, useValue: resendEmailService },
+        { provide: MailerService, useValue: mailerService },
       ],
     }).compile();
 
@@ -247,7 +247,7 @@ describe('EventsService', () => {
         workflowId: 'wf-1',
       });
 
-      expect(resendEmailService.send).toHaveBeenCalledWith(
+      expect(mailerService.send).toHaveBeenCalledWith(
         expect.objectContaining({
           to: 'alert@example.com',
           subject: expect.stringContaining('Test Event'),
@@ -256,7 +256,7 @@ describe('EventsService', () => {
     });
 
     it('should NOT block on email failure', async () => {
-      resendEmailService.send.mockRejectedValue(new Error('Email API down'));
+      mailerService.send.mockRejectedValue(new Error('Email API down'));
 
       setupTriggerMocks(prisma);
 
@@ -271,7 +271,7 @@ describe('EventsService', () => {
       expect(result.id).toBe('evt-1');
     });
 
-    it('should create in-app notification for workflow owner', async () => {
+    it('should create in-app notification for workflow owner and IN_APP recipients', async () => {
       setupTriggerMocks(prisma);
 
       await service.trigger({
@@ -280,8 +280,17 @@ describe('EventsService', () => {
         workflowId: 'wf-1',
       });
 
+      // Owner (user-1) and IN_APP recipient (user-2)
+      expect(notificationsService.send).toHaveBeenCalledTimes(2);
       expect(notificationsService.send).toHaveBeenCalledWith({
         userId: 'user-1',
+        type: 'EVENT_TRIGGERED',
+        title: expect.stringContaining('Test Event'),
+        body: expect.any(String),
+        metadata: { eventId: 'evt-1', workflowId: 'wf-1' },
+      });
+      expect(notificationsService.send).toHaveBeenCalledWith({
+        userId: 'user-2',
         type: 'EVENT_TRIGGERED',
         title: expect.stringContaining('Test Event'),
         body: expect.any(String),
@@ -302,7 +311,7 @@ describe('EventsService', () => {
 
       expect(result).toBeDefined();
       // No emails sent when no recipients
-      expect(resendEmailService.send).not.toHaveBeenCalled();
+      expect(mailerService.send).not.toHaveBeenCalled();
       // In-app notification still created for workflow owner
       expect(notificationsService.send).toHaveBeenCalled();
     });
@@ -310,7 +319,7 @@ describe('EventsService', () => {
     it('should not send email when no EMAIL recipients exist', async () => {
       const workflowInAppOnly = {
         ...mockWorkflow,
-        recipients: [{ channel: 'IN_APP', destination: 'user@example.com' }],
+        recipients: [{ channel: 'IN_APP', destination: 'user-2' }],
       };
 
       setupTriggerMocks(prisma, { workflow: workflowInAppOnly });
@@ -321,7 +330,7 @@ describe('EventsService', () => {
         workflowId: 'wf-1',
       });
 
-      expect(resendEmailService.send).not.toHaveBeenCalled();
+      expect(mailerService.send).not.toHaveBeenCalled();
     });
   });
 

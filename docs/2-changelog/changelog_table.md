@@ -2,6 +2,7 @@
 
 | Version | Week | Commit Message                                                                                     |
 | ------- | ---- | -------------------------------------------------------------------------------------------------- |
+| `0.6.0` | 1    | feat: Nodemailer SMTP migration, HTML email templates, user selector, and IN_APP recipient routing |
 | `0.5.0` | 1    | feat: end-to-end type safety improvements and error handling hardening                             |
 | `0.4.0` | 1    | feat: notifications system v0.4.0 - in-app notifications, SSE real-time delivery, email on trigger |
 | `0.3.0` | 1    | feat: core domain model refinements, auth hardening, code review fixes                             |
@@ -10,6 +11,15 @@
 
 # Changelog Summary
 
+- **v0.6.0 (Nodemailer & User Selector - Week 1, 02-04-2026)**:
+  - **Backend**: Migrated from Resend (API-key) to Nodemailer (SMTP). Graceful degradation when SMTP unconfigured.
+  - **Backend**: HTML email templates (event triggered, resolved, snoozed, daily summary) with shared baseLayout
+  - **Backend**: `config.getFeatures` endpoint exposes `emailEnabled` flag, `users.list` returns filtered user list
+  - **Backend**: IN_APP recipients now receive notifications by user ID (previously unused), deduplicated with workflow owner
+  - **Backend**: MailerModule DRY refactor, ConfigRouter protected by AuthMiddleware
+  - **Frontend**: EMAIL option conditionally rendered, user selector dropdown for recipient destination
+  - **Shared**: `appConfigOutputSchema`, `userListItemSchema`, `userListOutputSchema`
+  - **Tests**: 130 backend tests pass, updated IN_APP mock destinations to user IDs
 - **v0.5.0 (Type Safety & Error Handling - Week 1, 02-04-2026)**:
   - **Shared**: Zod output schemas for all 21 tRPC procedures (workflows, events, auth, notifications)
   - **Shared**: Split workflowOutputSchema into strict base + workflowWithCountSchema + workflowDetailOutputSchema

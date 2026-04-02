@@ -78,6 +78,9 @@ workflow-manager/
 │   │       │   ├── workflows/      # CRUD, activate/deactivate
 │   │       │   ├── events/         # Trigger, history, resolve, snooze, snooze-expiration cron
 │   │       │   ├── notifications/  # In-app + email channels
+│   │       │   ├── mailer/         # Nodemailer SMTP transport + HTML templates
+│   │       │   ├── config/         # App config feature flags
+│   │       │   ├── users/          # User list endpoint
 │   │       │   ├── history/        # Paginated, filtered event history
 │   │       │   └── daily-summary/  # Cron-based daily reports
 │   │       ├── trpc/
@@ -85,7 +88,6 @@ workflow-manager/
 │   │       │   └── context.ts      # tRPC context (auth, db)
 │   │       ├── common/             # Filters, guards, interceptors
 │   │       ├── modules/            # Independent external API modules
-│   │       │   └── resend/         # Email provider (example)
 │   │       ├── config/             # App configuration
 │   │       ├── database/           # Prisma repository layer (optional)
 │   │       ├── utils/              # Shared utilities
@@ -202,16 +204,21 @@ pnpm --filter prisma db:migrate    # Run migrations
 
 ### Environment Variables
 
-| Variable             | Description                     | Default       |
-| -------------------- | ------------------------------- | ------------- |
-| `DATABASE_URL`       | PostgreSQL connection string    | -             |
-| `JWT_SECRET`         | JWT signing secret (min 32ch)   | -             |
-| `JWT_REFRESH_SECRET` | Refresh token secret            | -             |
-| `JWT_EXPIRATION`     | Access token TTL                | `1h`          |
-| `COOKIE_DOMAIN`      | httpOnly cookie domain          | `localhost`   |
-| `RESEND_API_KEY`     | Email provider API key          | -             |
-| `REDIS_URL`          | Redis connection (queues/cache) | -             |
-| `NODE_ENV`           | Environment                     | `development` |
+| Variable             | Description                     | Default                |
+| -------------------- | ------------------------------- | ---------------------- |
+| `DATABASE_URL`       | PostgreSQL connection string    | -                      |
+| `JWT_SECRET`         | JWT signing secret (min 32ch)   | -                      |
+| `JWT_REFRESH_SECRET` | Refresh token secret            | -                      |
+| `JWT_EXPIRATION`     | Access token TTL                | `1h`                   |
+| `COOKIE_DOMAIN`      | httpOnly cookie domain          | `localhost`            |
+| `SMTP_HOST`          | SMTP server hostname (optional) | -                      |
+| `SMTP_PORT`          | SMTP server port                | `587`                  |
+| `SMTP_SECURE`        | Use TLS for SMTP                | `false`                |
+| `SMTP_USER`          | SMTP auth username (optional)   | -                      |
+| `SMTP_PASS`          | SMTP auth password (optional)   | -                      |
+| `SMTP_FROM`          | Default sender email address    | `noreply@workflow.dev` |
+| `REDIS_URL`          | Redis connection (queues/cache) | -                      |
+| `NODE_ENV`           | Environment                     | `development`          |
 
 ### Configuration Approach
 
@@ -229,10 +236,12 @@ pnpm --filter prisma db:migrate    # Run migrations
 ```typescript
 // app.router.ts - Root router merging all feature routers
 export const appRouter = router({
+  auth: authRouter,
   workflows: workflowRouter,
   events: eventRouter,
   notifications: notificationRouter,
-  history: historyRouter,
+  config: configRouter,
+  users: usersRouter,
 });
 
 export type AppRouter = typeof appRouter;
@@ -365,8 +374,18 @@ Server-Sent Events (SSE) for pushing live notifications to connected clients. Us
 
 ### Channels
 
-1. **In-app** - Real-time via SSE, persisted in `Notification` model for history
-2. **Email** - Via Resend through independent module (`features/resend/`), fire-and-forget with `Promise.allSettled`. `ResendEmailService` throws `TRPCError` (not generic `Error`) for consistent error propagation.
+1. **In-app** - Real-time via SSE, persisted in `Notification` model for history. IN_APP recipients are stored by user ID in the workflow's recipients array.
+2. **Email** - Via Nodemailer through `features/mailer/` module. SMTP-based (no API key required). Graceful degradation: when `SMTP_HOST` is not set, emails are skipped with a warning log. Fire-and-forget with `Promise.allSettled`. `MailerService` throws `TRPCError` for consistent error propagation.
+
+### Email Templates
+
+HTML email templates in `features/mailer/templates/` use table-based layouts for email client compatibility with inline styles:
+
+- `baseLayout()` — shared wrapper with purple gradient header and footer
+- `eventTriggeredTemplate()` — red alert badge, event details, optional payload metrics table
+- `eventResolvedTemplate()` — green resolved badge with timestamp
+- `eventSnoozedTemplate()` — amber snoozed badge with until time
+- `dailySummaryTemplate()` — blue badge, stat cards, per-workflow detail table
 
 ### Architecture
 
@@ -374,8 +393,10 @@ Server-Sent Events (SSE) for pushing live notifications to connected clients. Us
 - `NotificationsService.notify()` — low-level SSE push (synchronous, no DB write)
 - tRPC router exposes `list` (paginated, with `unreadOnly` filter), `unreadCount`, `markAsRead` (with ownership validation), `markAllAsRead`
 - `markAsRead` uses optimized single `updateMany` query with FORBIDDEN/NOT_FOUND fallback
-- `EventsService.trigger()` calls `NotificationsService.send()` for workflow owner and dispatches emails to EMAIL-channel recipients
+- `EventsService.trigger()` sends in-app notifications to all IN_APP recipients (by user ID) + workflow owner (deduplicated via `Set`), and dispatches emails to EMAIL-channel recipients
 - Notification metadata is typed via `notificationMetadataSchema` (`{ eventId, workflowId }`) at both Zod and application layer
+- `config.getFeatures` tRPC query exposes `{ emailEnabled }` so frontend conditionally shows/hides EMAIL option
+- `users.list` tRPC query returns registered users excluding the current user and system user
 
 ### Frontend
 
@@ -507,7 +528,7 @@ sequenceDiagram
         ES->>DB: Insert new event
         ES->>NS: Notify subscribers
         NS->>WS: Push real-time notification
-        NS->>Resend: Send email (async)
+        NS->>SMTP: Send email via Nodemailer (async)
     else Duplicate exists
         ES-->>API: Return existing event
     end

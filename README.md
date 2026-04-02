@@ -127,10 +127,16 @@ See [`.env.example`](.env.example) for all available variables:
 | `JWT_EXPIRATION`          | Access token TTL                   | `15m`                    |
 | `REDIS_URL`               | Redis connection string            | `redis://localhost:6380` |
 | `REDIS_PASSWORD`          | Redis authentication password      | `redisdevpass`           |
+| `SMTP_HOST`               | SMTP server hostname (optional)    | -                        |
+| `SMTP_PORT`               | SMTP server port                   | `587`                    |
+| `SMTP_SECURE`             | Use TLS for SMTP                   | `false`                  |
+| `SMTP_USER`               | SMTP auth username (optional)      | -                        |
+| `SMTP_PASS`               | SMTP auth password (optional)      | -                        |
+| `SMTP_FROM`               | Default sender email               | `noreply@workflow.dev`   |
 | `CORS_ORIGIN`             | Allowed frontend origin            | `http://localhost:3000`  |
 | `PORT`                    | Backend port                       | `4000`                   |
 | `NEXT_PUBLIC_BACKEND_URL` | Backend URL for the frontend       | `http://localhost:4000`  |
 
 ## Version
 
-Current version: **0.5.0** — See [changelog](docs/2-changelog/w1_v0.5.0.md) for details.
+Current version: **0.6.0** — See [changelog](docs/2-changelog/w1_v0.6.0.md) for details.

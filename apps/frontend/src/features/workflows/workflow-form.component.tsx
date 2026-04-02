@@ -8,6 +8,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Separator } from '@/components/ui/separator';
 import { Trash2 } from 'lucide-react';
 import { useWorkflowForm, type WorkflowFormData } from './use-workflow-form.hook';
+import { trpc } from '@/lib/trpc';
 
 const TRIGGER_OPERATORS = ['>', '<', '>=', '<=', '==', '!='] as const;
 const METRIC_SUGGESTIONS = [
@@ -26,6 +27,9 @@ export function WorkflowForm({ initialData }: WorkflowFormProps = {}) {
   const { form, recipientsField, onSubmit, isLoading, error, isEditMode } = useWorkflowForm({
     initialData,
   });
+  const { data: appConfig } = trpc.config.getFeatures.useQuery();
+  const emailEnabled = appConfig?.emailEnabled ?? false;
+  const { data: users } = trpc.users.list.useQuery();
   const {
     register,
     watch,
@@ -232,18 +236,30 @@ export function WorkflowForm({ initialData }: WorkflowFormProps = {}) {
                   <Label className="text-xs">Channel</Label>
                   <select
                     className="flex h-9 rounded-md border bg-transparent px-3 py-1 text-sm"
-                    {...register(`recipients.${index}.channel`)}
+                    {...register(`recipients.${index}.channel`, {
+                      onChange: () => setValue(`recipients.${index}.destination`, ''),
+                    })}
                   >
                     <option value="IN_APP">In-App</option>
-                    <option value="EMAIL">Email</option>
+                    {emailEnabled && <option value="EMAIL">Email</option>}
                   </select>
                 </div>
                 <div className="flex-1 space-y-1">
                   <Label className="text-xs">Destination</Label>
-                  <Input
-                    placeholder="e.g. admin@example.com"
+                  <select
+                    className="flex h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm"
                     {...register(`recipients.${index}.destination`)}
-                  />
+                  >
+                    <option value="">Select a user</option>
+                    {(users ?? []).map((user) => {
+                      const isEmail = watch(`recipients.${index}.channel`) === 'EMAIL';
+                      return (
+                        <option key={user.id} value={isEmail ? user.email : user.id}>
+                          {user.name} ({user.email})
+                        </option>
+                      );
+                    })}
+                  </select>
                 </div>
                 <Button
                   type="button"

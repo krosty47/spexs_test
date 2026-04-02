@@ -2,22 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../database/prisma.service';
-import { ResendEmailService } from '../resend';
-
-interface WorkflowSummaryRow {
-  workflowName: string;
-  open: number;
-  resolved: number;
-  snoozed: number;
-}
-
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
+import { MailerService } from '../mailer/services/mailer.service';
+import { dailySummaryTemplate, type WorkflowSummaryRow } from '../mailer/templates';
 
 @Injectable()
 export class DailySummaryService {
@@ -25,20 +11,20 @@ export class DailySummaryService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly resendEmailService: ResendEmailService,
+    private readonly mailerService: MailerService,
     private readonly configService: ConfigService,
   ) {}
 
   /**
    * Daily cron job at 8 AM -- aggregates events from the last 24 hours
-   * and sends a summary email via Resend (if configured).
+   * and sends a summary email via SMTP (if configured).
    */
   @Cron(CronExpression.EVERY_DAY_AT_8AM)
   async generateSummary(): Promise<void> {
-    // Check if Resend is configured before querying the DB
-    const apiKey = this.configService.get<string>('RESEND_API_KEY');
-    if (!apiKey) {
-      this.logger.warn('RESEND_API_KEY not configured -- skipping daily summary email');
+    // Check if SMTP is configured before querying the DB
+    const smtpHost = this.configService.get<string>('SMTP_HOST');
+    if (!smtpHost) {
+      this.logger.warn('SMTP_HOST not configured -- skipping daily summary email');
       return;
     }
 
@@ -79,7 +65,7 @@ export class DailySummaryService {
     }
 
     const rows = [...rowMap.values()];
-    const html = this.buildHtml(rows, since);
+    const html = dailySummaryTemplate({ rows, since });
 
     const recipient = this.configService.get<string>('DAILY_SUMMARY_TO');
     if (!recipient) {
@@ -88,7 +74,7 @@ export class DailySummaryService {
     }
 
     try {
-      await this.resendEmailService.send({
+      await this.mailerService.send({
         to: recipient,
         subject: `Daily Event Summary - ${new Date().toLocaleDateString()}`,
         html,
@@ -97,32 +83,5 @@ export class DailySummaryService {
     } catch (error) {
       this.logger.error('Failed to send daily summary email', error);
     }
-  }
-
-  private buildHtml(rows: WorkflowSummaryRow[], since: Date): string {
-    const tableRows = rows
-      .map(
-        (r) =>
-          `<tr><td>${escapeHtml(r.workflowName)}</td><td>${r.open}</td><td>${r.resolved}</td><td>${r.snoozed}</td></tr>`,
-      )
-      .join('');
-
-    return `
-      <h2>Daily Event Summary</h2>
-      <p>Events since ${since.toISOString()}</p>
-      <table border="1" cellpadding="8" cellspacing="0">
-        <thead>
-          <tr>
-            <th>Workflow</th>
-            <th>Open</th>
-            <th>Resolved</th>
-            <th>Snoozed</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${tableRows}
-        </tbody>
-      </table>
-    `.trim();
   }
 }
