@@ -26,8 +26,8 @@ export const notificationSchema = z.object({
   body: z.string(),
   isRead: z.boolean(),
   metadata: notificationMetadataSchema.nullable(),
-  createdAt: z.date(),
-  updatedAt: z.date(),
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
   userId: z.string(),
 });
 
@@ -55,3 +55,23 @@ export const unreadCountOutputSchema = z.object({
 });
 
 export type UnreadCountOutput = z.infer<typeof unreadCountOutputSchema>;
+
+// --- Output Schemas (tRPC procedure return shapes) ---
+
+/** Paginated notification list returned by list */
+export const notificationListOutputSchema = z.object({
+  data: z.array(notificationSchema),
+  total: z.number(),
+  page: z.number(),
+  limit: z.number(),
+  totalPages: z.number(),
+});
+
+export type NotificationListOutput = z.infer<typeof notificationListOutputSchema>;
+
+/** Batch mark-all-as-read result */
+export const markAllAsReadOutputSchema = z.object({
+  count: z.number(),
+});
+
+export type MarkAllAsReadOutput = z.infer<typeof markAllAsReadOutputSchema>;

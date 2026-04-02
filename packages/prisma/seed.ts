@@ -7,7 +7,7 @@ const PASSWORD_HASH = '$2b$12$mG.QXtxZvgszMQ2QRF2X3uM18YiAOTuoGJOftI2w/.IHlyiW5X
 
 async function main() {
   // Seed system user (used for system-generated EventHistory entries)
-  const systemUser = await prisma.user.upsert({
+  const _systemUser = await prisma.user.upsert({
     where: { email: 'system@workflow.internal' },
     update: {},
     create: {
@@ -21,35 +21,39 @@ async function main() {
 
   // Seed users (passwords: "password12345" hashed with bcrypt cost 12)
   const adminUser = await prisma.user.upsert({
-    where: { email: 'admin@workflow.dev' },
+    where: { email: 'admin@spexs.dev' },
     update: { passwordHash: PASSWORD_HASH },
     create: {
-      email: 'admin@workflow.dev',
-      name: 'Admin User',
+      email: 'admin@spexs.dev',
+      name: 'Christian Coriasco',
       passwordHash: PASSWORD_HASH,
       role: Role.ADMIN,
     },
   });
 
   const regularUser = await prisma.user.upsert({
-    where: { email: 'user@workflow.dev' },
+    where: { email: 'support@spexs.dev' },
     update: { passwordHash: PASSWORD_HASH },
     create: {
-      email: 'user@workflow.dev',
-      name: 'Regular User',
+      email: 'support@spexs.dev',
+      name: 'Support Agent',
       passwordHash: PASSWORD_HASH,
       role: Role.USER,
     },
   });
 
-  // Seed workflows
+  // ---------------------------------------------------------------------------
+  // Workflows — WhatsApp Chatbot Monitoring for SPEXS.ai
+  // ---------------------------------------------------------------------------
+
+  // 1. Chatbot Response Time (THRESHOLD)
   const workflow1Data = {
     triggerType: TriggerType.THRESHOLD,
-    triggerConfig: { type: 'THRESHOLD', metric: 'cpu_usage', operator: '>', value: 90 },
-    outputMessage: 'Alert: {{metric}} reached {{value}}%',
+    triggerConfig: { type: 'THRESHOLD', metric: 'wa_response_time_ms', operator: '>', value: 5000 },
+    outputMessage: 'Alert: WhatsApp chatbot {{metric}} is {{value}}ms — exceeds 5s SLA',
     recipients: [
-      { channel: 'IN_APP', destination: 'admin@workflow.dev' },
-      { channel: 'EMAIL', destination: 'admin@workflow.dev' },
+      { channel: 'IN_APP', destination: 'admin@spexs.dev' },
+      { channel: 'EMAIL', destination: 'admin@spexs.dev' },
     ],
   };
   const workflow1 = await prisma.workflow.upsert({
@@ -57,60 +61,146 @@ async function main() {
     update: workflow1Data,
     create: {
       id: 'seed-workflow-1',
-      name: 'CPU Usage Alert',
-      description: 'Triggers when CPU usage exceeds 90%',
+      name: 'WA Chatbot Response Time',
+      description: 'Triggers when WhatsApp chatbot response time exceeds 5 seconds',
       isActive: true,
       ...workflow1Data,
       userId: adminUser.id,
     },
   });
 
+  // 2. Message Delivery Failure Rate (THRESHOLD)
   const workflow2Data = {
-    triggerType: TriggerType.VARIANCE,
-    triggerConfig: { type: 'VARIANCE', baseValue: 50, deviationPercentage: 70 },
-    outputMessage: '{{metric}} deviated to {{value}}, exceeding threshold',
-    recipients: [{ channel: 'IN_APP', destination: 'admin@workflow.dev' }],
+    triggerType: TriggerType.THRESHOLD,
+    triggerConfig: {
+      type: 'THRESHOLD',
+      metric: 'wa_delivery_failure_pct',
+      operator: '>',
+      value: 5,
+    },
+    outputMessage: 'Alert: WhatsApp delivery failure rate at {{value}}% — check Meta API status',
+    recipients: [
+      { channel: 'IN_APP', destination: 'admin@spexs.dev' },
+      { channel: 'EMAIL', destination: 'admin@spexs.dev' },
+    ],
   };
   const workflow2 = await prisma.workflow.upsert({
     where: { id: 'seed-workflow-2' },
     update: workflow2Data,
     create: {
       id: 'seed-workflow-2',
-      name: 'Memory Threshold',
-      description: 'Triggers when memory usage exceeds 85%',
+      name: 'WA Delivery Failure Rate',
+      description: 'Triggers when WhatsApp message delivery failure rate exceeds 5%',
       isActive: true,
       ...workflow2Data,
       userId: adminUser.id,
     },
   });
 
+  // 3. Conversation Abandonment Rate (VARIANCE)
   const workflow3Data = {
-    triggerType: TriggerType.THRESHOLD,
-    triggerConfig: { type: 'THRESHOLD', metric: 'disk_usage', operator: '>=', value: 95 },
-    outputMessage: 'Critical: {{metric}} is at {{value}}%',
-    recipients: [],
+    triggerType: TriggerType.VARIANCE,
+    triggerConfig: { type: 'VARIANCE', baseValue: 15, deviationPercentage: 40 },
+    outputMessage:
+      'Warning: Conversation abandonment rate deviated to {{value}}% — review chatbot flows',
+    recipients: [{ channel: 'IN_APP', destination: 'admin@spexs.dev' }],
   };
   const workflow3 = await prisma.workflow.upsert({
     where: { id: 'seed-workflow-3' },
     update: workflow3Data,
     create: {
       id: 'seed-workflow-3',
-      name: 'Disk Space Monitor',
-      description: 'Monitors disk space and alerts at 95% capacity',
-      isActive: false,
+      name: 'WA Conversation Abandonment',
+      description:
+        'Triggers when conversation abandonment deviates more than 40% from the 15% baseline',
+      isActive: true,
       ...workflow3Data,
+      userId: adminUser.id,
+    },
+  });
+
+  // 4. User Satisfaction Score (THRESHOLD)
+  const workflow4Data = {
+    triggerType: TriggerType.THRESHOLD,
+    triggerConfig: { type: 'THRESHOLD', metric: 'wa_csat_score', operator: '<', value: 3.5 },
+    outputMessage: 'Alert: WhatsApp chatbot CSAT dropped to {{value}} — below 3.5 threshold',
+    recipients: [
+      { channel: 'IN_APP', destination: 'admin@spexs.dev' },
+      { channel: 'IN_APP', destination: 'support@spexs.dev' },
+    ],
+  };
+  const workflow4 = await prisma.workflow.upsert({
+    where: { id: 'seed-workflow-4' },
+    update: workflow4Data,
+    create: {
+      id: 'seed-workflow-4',
+      name: 'WA Chatbot CSAT Score',
+      description: 'Triggers when WhatsApp chatbot satisfaction score drops below 3.5/5',
+      isActive: true,
+      ...workflow4Data,
+      userId: adminUser.id,
+    },
+  });
+
+  // 5. WhatsApp API Error Rate (VARIANCE)
+  const workflow5Data = {
+    triggerType: TriggerType.VARIANCE,
+    triggerConfig: { type: 'VARIANCE', baseValue: 2, deviationPercentage: 100 },
+    outputMessage: 'Critical: WA API error rate spiked to {{value}}% — investigate Meta Cloud API',
+    recipients: [
+      { channel: 'IN_APP', destination: 'admin@spexs.dev' },
+      { channel: 'EMAIL', destination: 'admin@spexs.dev' },
+    ],
+  };
+  const workflow5 = await prisma.workflow.upsert({
+    where: { id: 'seed-workflow-5' },
+    update: workflow5Data,
+    create: {
+      id: 'seed-workflow-5',
+      name: 'WA API Error Rate',
+      description: 'Triggers when WhatsApp Cloud API error rate doubles from the 2% baseline',
+      isActive: true,
+      ...workflow5Data,
+      userId: adminUser.id,
+    },
+  });
+
+  // 6. Message Queue Depth (THRESHOLD) — inactive, used for testing
+  const workflow6Data = {
+    triggerType: TriggerType.THRESHOLD,
+    triggerConfig: { type: 'THRESHOLD', metric: 'wa_queue_depth', operator: '>=', value: 500 },
+    outputMessage: 'Critical: {{value}} messages queued — WhatsApp outbound queue is backing up',
+    recipients: [],
+  };
+  const workflow6 = await prisma.workflow.upsert({
+    where: { id: 'seed-workflow-6' },
+    update: workflow6Data,
+    create: {
+      id: 'seed-workflow-6',
+      name: 'WA Message Queue Depth',
+      description: 'Triggers when outbound WhatsApp message queue exceeds 500 pending messages',
+      isActive: false,
+      ...workflow6Data,
       userId: regularUser.id,
     },
   });
 
-  // Seed events
+  // ---------------------------------------------------------------------------
+  // Events — WhatsApp Chatbot Incidents
+  // ---------------------------------------------------------------------------
+
   const event1 = await prisma.event.upsert({
     where: { id: 'seed-event-1' },
     update: {},
     create: {
       id: 'seed-event-1',
-      title: 'High CPU on server-01',
-      payload: { server: 'server-01', cpuUsage: 95, timestamp: new Date().toISOString() },
+      title: 'Slow chatbot response — LATAM region',
+      payload: {
+        region: 'LATAM',
+        responseTimeMs: 7200,
+        endpoint: '/v17.0/messages',
+        timestamp: new Date().toISOString(),
+      },
       status: EventStatus.OPEN,
       workflowId: workflow1.id,
     },
@@ -121,10 +211,15 @@ async function main() {
     update: {},
     create: {
       id: 'seed-event-2',
-      title: 'High CPU on server-02',
-      payload: { server: 'server-02', cpuUsage: 92, timestamp: new Date().toISOString() },
+      title: 'High delivery failures — template messages',
+      payload: {
+        failureRate: 8.3,
+        templateName: 'order_confirmation',
+        failedCount: 142,
+        timestamp: new Date().toISOString(),
+      },
       status: EventStatus.RESOLVED,
-      workflowId: workflow1.id,
+      workflowId: workflow2.id,
       resolvedAt: new Date(),
       resolvedById: adminUser.id,
     },
@@ -135,10 +230,15 @@ async function main() {
     update: {},
     create: {
       id: 'seed-event-3',
-      title: 'Memory spike on db-primary',
-      payload: { server: 'db-primary', memoryUsage: 88, timestamp: new Date().toISOString() },
+      title: 'Abandonment spike — onboarding flow',
+      payload: {
+        flow: 'onboarding',
+        abandonmentRate: 23.5,
+        baselineRate: 15,
+        timestamp: new Date().toISOString(),
+      },
       status: EventStatus.OPEN,
-      workflowId: workflow2.id,
+      workflowId: workflow3.id,
     },
   });
 
@@ -147,10 +247,15 @@ async function main() {
     update: {},
     create: {
       id: 'seed-event-4',
-      title: 'Memory warning on cache-01',
-      payload: { server: 'cache-01', memoryUsage: 86, timestamp: new Date().toISOString() },
+      title: 'CSAT drop — billing inquiries',
+      payload: {
+        category: 'billing',
+        csatScore: 2.8,
+        sampleSize: 85,
+        timestamp: new Date().toISOString(),
+      },
       status: EventStatus.SNOOZED,
-      workflowId: workflow2.id,
+      workflowId: workflow4.id,
     },
   });
 
@@ -159,43 +264,48 @@ async function main() {
     update: {},
     create: {
       id: 'seed-event-5',
-      title: 'Disk usage critical on storage-01',
-      payload: { server: 'storage-01', diskUsage: 96, timestamp: new Date().toISOString() },
+      title: 'WA Cloud API error spike',
+      payload: {
+        errorRate: 4.7,
+        topError: '131026 (Rate limit hit)',
+        affectedNumbers: 12,
+        timestamp: new Date().toISOString(),
+      },
       status: EventStatus.OPEN,
-      workflowId: workflow3.id,
+      workflowId: workflow5.id,
     },
   });
 
   // Seed additional events for pagination testing (events 6-30)
-  const servers = [
-    'web-01',
-    'web-02',
-    'api-01',
-    'api-02',
-    'worker-01',
-    'worker-02',
-    'redis-01',
-    'pg-replica-01',
-    'lb-01',
-    'monitor-01',
+  const scenarios = [
+    { title: 'Slow response — product catalog query', flow: 'product_search' },
+    { title: 'Delivery failure — promotional broadcast', flow: 'promo_broadcast' },
+    { title: 'Abandonment — payment flow', flow: 'payment' },
+    { title: 'Low CSAT — returns process', flow: 'returns' },
+    { title: 'API timeout — webhook delivery', flow: 'webhooks' },
+    { title: 'Queue backup — bulk campaign', flow: 'bulk_campaign' },
+    { title: 'Slow response — FAQ bot', flow: 'faq' },
+    { title: 'Delivery failure — interactive buttons', flow: 'interactive_msg' },
+    { title: 'Abandonment — account linking', flow: 'account_link' },
+    { title: 'API error — media upload', flow: 'media_upload' },
   ];
   const statuses = [EventStatus.OPEN, EventStatus.RESOLVED, EventStatus.SNOOZED];
-  const workflows = [workflow1, workflow2, workflow3];
+  const workflows = [workflow1, workflow2, workflow3, workflow4, workflow5, workflow6];
 
   for (let i = 6; i <= 30; i++) {
-    const server = servers[(i - 6) % servers.length];
+    const scenario = scenarios[(i - 6) % scenarios.length];
     const status = statuses[i % 3];
-    const workflow = workflows[i % 3];
+    const workflow = workflows[i % 6];
 
     await prisma.event.upsert({
       where: { id: `seed-event-${i}` },
       update: {},
       create: {
         id: `seed-event-${i}`,
-        title: `Alert on ${server} (#${i})`,
+        title: `${scenario.title} (#${i})`,
         payload: {
-          server,
-          metric: 90 + (i % 10),
+          flow: scenario.flow,
+          metricValue: 90 + (i % 10),
           timestamp: new Date(Date.now() - i * 3600000).toISOString(),
         },
         status,
@@ -207,7 +317,10 @@ async function main() {
     });
   }
 
-  // Seed event history
+  // ---------------------------------------------------------------------------
+  // Event History
+  // ---------------------------------------------------------------------------
+
   await prisma.eventHistory.upsert({
     where: { id: 'seed-history-1' },
     update: {},
@@ -241,13 +354,17 @@ async function main() {
     },
   });
 
-  // Seed comments
+  // ---------------------------------------------------------------------------
+  // Comments
+  // ---------------------------------------------------------------------------
+
   await prisma.comment.upsert({
     where: { id: 'seed-comment-1' },
     update: {},
     create: {
       id: 'seed-comment-1',
-      content: 'Investigating high CPU usage on server-01',
+      content:
+        'Investigating slow response times in LATAM — may be related to Meta API routing issues in the region',
       eventId: event1.id,
       userId: adminUser.id,
     },
@@ -258,34 +375,42 @@ async function main() {
     update: {},
     create: {
       id: 'seed-comment-2',
-      content: 'Resolved by scaling down background jobs',
+      content:
+        'Resolved — the order_confirmation template was flagged by Meta for review. Re-approved and delivery rate is back to normal.',
       eventId: event2.id,
       userId: adminUser.id,
     },
   });
 
-  // Seed snooze record
+  // ---------------------------------------------------------------------------
+  // Snooze record
+  // ---------------------------------------------------------------------------
+
   await prisma.snooze.upsert({
     where: { eventId: event4.id },
     update: {},
     create: {
       id: 'seed-snooze-1',
       until: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours from now
-      reason: 'Known issue, maintenance window scheduled',
+      reason:
+        'Known issue — billing FAQ responses are being reworked. New intents deploying tomorrow.',
       eventId: event4.id,
       userId: regularUser.id,
     },
   });
 
-  // Seed notifications
+  // ---------------------------------------------------------------------------
+  // Notifications
+  // ---------------------------------------------------------------------------
+
   await prisma.notification.upsert({
     where: { id: 'seed-notif-1' },
     update: {},
     create: {
       id: 'seed-notif-1',
       type: NotificationType.EVENT_TRIGGERED,
-      title: 'Event triggered: High CPU on server-01',
-      body: 'Workflow "CPU Usage Alert" triggered a new event.',
+      title: 'Slow chatbot response — LATAM region',
+      body: 'Workflow "WA Chatbot Response Time" triggered — response time at 7200ms.',
       isRead: false,
       metadata: { eventId: 'seed-event-1', workflowId: 'seed-workflow-1' },
       userId: adminUser.id,
@@ -298,10 +423,10 @@ async function main() {
     create: {
       id: 'seed-notif-2',
       type: NotificationType.EVENT_RESOLVED,
-      title: 'Event resolved: High CPU on server-02',
-      body: 'Event "High CPU on server-02" has been resolved.',
+      title: 'Resolved: High delivery failures — template messages',
+      body: 'Event "High delivery failures — template messages" has been resolved.',
       isRead: true,
-      metadata: { eventId: 'seed-event-2', workflowId: 'seed-workflow-1' },
+      metadata: { eventId: 'seed-event-2', workflowId: 'seed-workflow-2' },
       userId: adminUser.id,
     },
   });
@@ -312,10 +437,10 @@ async function main() {
     create: {
       id: 'seed-notif-3',
       type: NotificationType.EVENT_SNOOZED,
-      title: 'Event snoozed: Memory warning on cache-01',
-      body: 'Event "Memory warning on cache-01" has been snoozed for 24 hours.',
+      title: 'Snoozed: CSAT drop — billing inquiries',
+      body: 'Event "CSAT drop — billing inquiries" snoozed for 24 hours — new intents deploying tomorrow.',
       isRead: false,
-      metadata: { eventId: 'seed-event-3', workflowId: 'seed-workflow-2' },
+      metadata: { eventId: 'seed-event-4', workflowId: 'seed-workflow-4' },
       userId: regularUser.id,
     },
   });
@@ -326,10 +451,24 @@ async function main() {
     create: {
       id: 'seed-notif-4',
       type: NotificationType.EVENT_TRIGGERED,
-      title: 'Event triggered: Memory spike on db-primary',
-      body: 'Workflow "Memory Threshold" triggered a new event.',
+      title: 'Abandonment spike — onboarding flow',
+      body: 'Workflow "WA Conversation Abandonment" triggered — abandonment rate at 23.5%.',
       isRead: false,
-      metadata: { eventId: 'seed-event-3', workflowId: 'seed-workflow-2' },
+      metadata: { eventId: 'seed-event-3', workflowId: 'seed-workflow-3' },
+      userId: adminUser.id,
+    },
+  });
+
+  await prisma.notification.upsert({
+    where: { id: 'seed-notif-5' },
+    update: {},
+    create: {
+      id: 'seed-notif-5',
+      type: NotificationType.EVENT_TRIGGERED,
+      title: 'WA Cloud API error spike',
+      body: 'Workflow "WA API Error Rate" triggered — error rate at 4.7%, top error: rate limit hit.',
+      isRead: false,
+      metadata: { eventId: 'seed-event-5', workflowId: 'seed-workflow-5' },
       userId: adminUser.id,
     },
   });

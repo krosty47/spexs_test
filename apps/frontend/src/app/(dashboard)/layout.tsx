@@ -7,6 +7,8 @@ import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { NotificationBell } from '@/features/notifications';
+import { ErrorBoundary } from '@/components/error-boundary.component';
+import { Toaster } from '@/components/ui/sonner';
 
 const navItems = [
   { href: '/workflows', label: 'Workflows', icon: '⚡' },
@@ -107,8 +109,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
           <NotificationBell />
         </header>
-        <main className="flex min-h-0 flex-1 flex-col p-4 sm:p-6">{children}</main>
+        <main className="flex min-h-0 flex-1 flex-col p-4 sm:p-6">
+          <ErrorBoundary>{children}</ErrorBoundary>
+        </main>
       </div>
+      <Toaster />
     </div>
   );
 }

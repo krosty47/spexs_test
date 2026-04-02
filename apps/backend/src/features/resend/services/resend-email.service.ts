@@ -1,15 +1,9 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { TRPCError } from '@trpc/server';
 import { Resend } from 'resend';
 
-import {
-  RESEND_CLIENT,
-  RESEND_MODULE_OPTIONS,
-} from '../constants/resend.constants';
-import {
-  ResendModuleOptions,
-  SendEmailOptions,
-  SendEmailResponse,
-} from '../interfaces';
+import { RESEND_CLIENT, RESEND_MODULE_OPTIONS } from '../constants/resend.constants';
+import { ResendModuleOptions, SendEmailOptions, SendEmailResponse } from '../interfaces';
 
 /**
  * Service for sending emails via Resend
@@ -49,16 +43,20 @@ export class ResendEmailService {
    */
   async send(emailOptions: SendEmailOptions): Promise<SendEmailResponse> {
     if (!this.resend) {
-      this.logger.warn(`Email skipped (no API key): "${emailOptions.subject}" to ${emailOptions.to}`);
+      this.logger.warn(
+        `Email skipped (no API key): "${emailOptions.subject}" to ${emailOptions.to}`,
+      );
       return { id: 'skipped-no-api-key' };
     }
 
     const from = emailOptions.from || this.options.defaultFrom;
 
     if (!from) {
-      throw new Error(
-        'No "from" address provided. Either pass it in emailOptions or set defaultFrom in module options.',
-      );
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message:
+          'No "from" address provided. Either pass it in emailOptions or set defaultFrom in module options.',
+      });
     }
 
     const payload: Record<string, unknown> = {
@@ -80,7 +78,10 @@ export class ResendEmailService {
 
     if (error) {
       this.logger.error(`Failed to send email: ${error.message}`, error);
-      throw new Error(`Failed to send email: ${error.message}`);
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: `Failed to send email: ${error.message}`,
+      });
     }
 
     const emailId = data?.id ?? 'unknown';

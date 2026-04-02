@@ -130,3 +130,7 @@ See [`.env.example`](.env.example) for all available variables:
 | `CORS_ORIGIN`             | Allowed frontend origin            | `http://localhost:3000`  |
 | `PORT`                    | Backend port                       | `4000`                   |
 | `NEXT_PUBLIC_BACKEND_URL` | Backend URL for the frontend       | `http://localhost:4000`  |
+
+## Version
+
+Current version: **0.5.0** — See [changelog](docs/2-changelog/w1_v0.5.0.md) for details.

@@ -202,16 +202,37 @@ describe('WorkflowsService', () => {
   });
 
   describe('delete', () => {
-    it('should delete workflow', async () => {
+    it('should delete workflow and cascade related records', async () => {
       prisma.workflow.findUnique.mockResolvedValue(mockWorkflow);
+      prisma.$transaction.mockImplementation(async (cb) => cb(prisma));
+      prisma.event.findMany.mockResolvedValue([{ id: 'evt-1' }, { id: 'evt-2' }] as never);
+      prisma.comment.deleteMany.mockResolvedValue({ count: 0 });
+      prisma.snooze.deleteMany.mockResolvedValue({ count: 0 });
+      prisma.eventHistory.deleteMany.mockResolvedValue({ count: 0 });
+      prisma.event.deleteMany.mockResolvedValue({ count: 2 });
       prisma.workflow.delete.mockResolvedValue(mockWorkflow);
 
       const result = await service.delete('wf-1');
 
       expect(result.id).toBe('wf-1');
+      expect(prisma.event.deleteMany).toHaveBeenCalledWith({
+        where: { workflowId: 'wf-1' },
+      });
       expect(prisma.workflow.delete).toHaveBeenCalledWith({
         where: { id: 'wf-1' },
       });
+    });
+
+    it('should delete workflow with no events', async () => {
+      prisma.workflow.findUnique.mockResolvedValue(mockWorkflow);
+      prisma.$transaction.mockImplementation(async (cb) => cb(prisma));
+      prisma.event.findMany.mockResolvedValue([]);
+      prisma.workflow.delete.mockResolvedValue(mockWorkflow);
+
+      const result = await service.delete('wf-1');
+
+      expect(result.id).toBe('wf-1');
+      expect(prisma.event.deleteMany).not.toHaveBeenCalled();
     });
 
     it('should throw NOT_FOUND for missing workflow', async () => {
@@ -226,7 +247,10 @@ describe('WorkflowsService', () => {
   describe('simulate', () => {
     it('should return triggered=true when condition is met', async () => {
       prisma.workflow.findUnique.mockResolvedValue(mockWorkflowWithTrigger);
-      triggerEvalService.evaluate.mockReturnValue({ triggered: true, details: 'THRESHOLD: cpu_usage 95 > 90 = true' });
+      triggerEvalService.evaluate.mockReturnValue({
+        triggered: true,
+        details: 'THRESHOLD: cpu_usage 95 > 90 = true',
+      });
       triggerEvalService.renderMessage.mockReturnValue('Alert: cpu_usage reached 95%');
       eventsService.trigger.mockResolvedValue({
         id: 'ev-1',
@@ -249,7 +273,10 @@ describe('WorkflowsService', () => {
 
     it('should return triggered=false when condition is not met', async () => {
       prisma.workflow.findUnique.mockResolvedValue(mockWorkflowWithTrigger);
-      triggerEvalService.evaluate.mockReturnValue({ triggered: false, details: 'THRESHOLD: cpu_usage 50 > 90 = false' });
+      triggerEvalService.evaluate.mockReturnValue({
+        triggered: false,
+        details: 'THRESHOLD: cpu_usage 50 > 90 = false',
+      });
       triggerEvalService.renderMessage.mockReturnValue('Alert: cpu_usage reached 50%');
 
       const result = await service.simulate('wf-1', 50, 'user-1', false);
@@ -318,7 +345,10 @@ describe('WorkflowsService', () => {
       triggerEvalService.evaluate.mockReturnValue({ triggered: true, details: 'triggered' });
       triggerEvalService.renderMessage.mockReturnValue('Alert message');
       eventsService.trigger.mockRejectedValue(
-        new TRPCError({ code: 'CONFLICT', message: 'An open event already exists for this workflow' }),
+        new TRPCError({
+          code: 'CONFLICT',
+          message: 'An open event already exists for this workflow',
+        }),
       );
 
       const result = await service.simulate('wf-1', 95, 'user-1', false);

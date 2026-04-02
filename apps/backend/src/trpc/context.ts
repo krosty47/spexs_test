@@ -15,10 +15,12 @@ export interface AppContextType {
   user: TrpcUser | null;
 }
 
+/** Request type with Fastify cookie support */
+type RequestWithCookies = ContextOptions['req'] & { cookies?: Record<string, string> };
+
 /** Safely extract a cookie value from the request object. */
 export function getCookie(ctx: AppContextType, name: string): string | undefined {
-  const cookies = (ctx.req as unknown as { cookies?: Record<string, string> }).cookies;
-  return cookies?.[name];
+  return (ctx.req as RequestWithCookies).cookies?.[name];
 }
 
 @Injectable()

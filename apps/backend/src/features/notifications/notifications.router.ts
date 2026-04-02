@@ -1,5 +1,12 @@
 import { Router, Query, Mutation, Input, Ctx, UseMiddlewares } from 'nestjs-trpc';
-import { notificationListSchema, markNotificationReadSchema } from '@workflow-manager/shared';
+import {
+  notificationListSchema,
+  markNotificationReadSchema,
+  notificationListOutputSchema,
+  unreadCountOutputSchema,
+  notificationSchema,
+  markAllAsReadOutputSchema,
+} from '@workflow-manager/shared';
 import type { z } from 'zod';
 import { NotificationsService } from './notifications.service';
 import { AuthMiddleware } from '../../trpc/auth.middleware';
@@ -10,7 +17,7 @@ import type { AppContextType } from '../../trpc/context';
 export class NotificationsRouter {
   constructor(private readonly notificationsService: NotificationsService) {}
 
-  @Query({ input: notificationListSchema })
+  @Query({ input: notificationListSchema, output: notificationListOutputSchema })
   async list(@Input() input: z.infer<typeof notificationListSchema>, @Ctx() ctx: AppContextType) {
     return this.notificationsService.findAllForUser(
       ctx.user!.id,
@@ -19,12 +26,12 @@ export class NotificationsRouter {
     );
   }
 
-  @Query()
+  @Query({ output: unreadCountOutputSchema })
   async unreadCount(@Ctx() ctx: AppContextType) {
     return this.notificationsService.getUnreadCount(ctx.user!.id);
   }
 
-  @Mutation({ input: markNotificationReadSchema })
+  @Mutation({ input: markNotificationReadSchema, output: notificationSchema.nullable() })
   async markAsRead(
     @Input() input: z.infer<typeof markNotificationReadSchema>,
     @Ctx() ctx: AppContextType,
@@ -32,7 +39,7 @@ export class NotificationsRouter {
     return this.notificationsService.markAsRead(input.id, ctx.user!.id);
   }
 
-  @Mutation()
+  @Mutation({ output: markAllAsReadOutputSchema })
   async markAllAsRead(@Ctx() ctx: AppContextType) {
     return this.notificationsService.markAllAsRead(ctx.user!.id);
   }

@@ -86,3 +86,71 @@ export interface SimulateWorkflowResult {
   dryRun: boolean;
   alreadyOpen?: boolean;
 }
+
+// --- Output Schemas (tRPC procedure return shapes) ---
+
+/** Base workflow fields returned by create, update, toggleActive, delete */
+export const workflowOutputSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  isActive: z.boolean(),
+  triggerType: z.enum(['THRESHOLD', 'VARIANCE']).nullable(),
+  triggerConfig: triggerConfigSchema.nullable(),
+  outputMessage: z.string().nullable(),
+  recipients: z.array(recipientSchema).nullable(),
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
+  userId: z.string(),
+});
+
+export type WorkflowOutput = z.infer<typeof workflowOutputSchema>;
+
+const embeddedEventSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  payload: z.record(z.unknown()),
+  status: z.enum(['OPEN', 'RESOLVED', 'SNOOZED']),
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
+  workflowId: z.string(),
+  resolvedAt: z.coerce.date().nullable(),
+  resolvedById: z.string().nullable(),
+});
+
+/** Workflow with event count (used in list items) */
+export const workflowWithCountSchema = workflowOutputSchema.extend({
+  _count: z.object({ events: z.number() }),
+});
+
+export type WorkflowWithCount = z.infer<typeof workflowWithCountSchema>;
+
+/** Paginated workflow list returned by findAll */
+export const workflowListOutputSchema = z.object({
+  data: z.array(workflowWithCountSchema),
+  total: z.number(),
+  page: z.number(),
+  limit: z.number(),
+  totalPages: z.number(),
+});
+
+export type WorkflowListOutput = z.infer<typeof workflowListOutputSchema>;
+
+/** Workflow detail returned by findOne (with events and _count) */
+export const workflowDetailOutputSchema = workflowOutputSchema.extend({
+  _count: z.object({ events: z.number() }),
+  events: z.array(embeddedEventSchema),
+});
+
+export type WorkflowDetailOutput = z.infer<typeof workflowDetailOutputSchema>;
+
+/** Simulation result output schema */
+export const simulateWorkflowOutputSchema = z.object({
+  triggered: z.boolean(),
+  message: z.string(),
+  details: z.string(),
+  dryRun: z.boolean(),
+  alreadyOpen: z.boolean().optional(),
+});
+
+export type SimulateWorkflowOutput = z.infer<typeof simulateWorkflowOutputSchema>;

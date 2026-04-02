@@ -7,58 +7,75 @@ import { z } from 'zod';
 import {
   loginSchema,
   registerSchema,
+  authOutputSchema,
+  trpcUserSchema,
   createWorkflowSchema,
   updateWorkflowSchema,
   workflowIdSchema,
   simulateWorkflowSchema,
+  workflowListOutputSchema,
+  workflowDetailOutputSchema,
+  workflowOutputSchema,
+  simulateWorkflowOutputSchema,
   triggerEventSchema,
   snoozeEventSchema,
   addCommentSchema,
+  eventListOutputSchema,
+  eventDetailOutputSchema,
+  eventOutputSchema,
+  addCommentOutputSchema,
   paginationSchema,
   eventFilterSchema,
   notificationListSchema,
   markNotificationReadSchema,
+  notificationListOutputSchema,
+  unreadCountOutputSchema,
+  notificationSchema,
+  markAllAsReadOutputSchema,
 } from '@workflow-manager/shared';
 
 const t = initTRPC.create();
 
 const authRouter = t.router({
-  login: t.procedure.input(loginSchema).mutation(() => null as any),
-  register: t.procedure.input(registerSchema).mutation(() => null as any),
+  login: t.procedure.input(loginSchema).output(authOutputSchema).mutation(() => null as any),
+  register: t.procedure.input(registerSchema).output(authOutputSchema).mutation(() => null as any),
   refresh: t.procedure
     .input(z.object({ refreshToken: z.string() }))
+    .output(authOutputSchema)
     .mutation(() => null as any),
-  me: t.procedure.query(() => null as any),
+  me: t.procedure.output(trpcUserSchema.nullable()).query(() => null as any),
 });
 
 const workflowsRouter = t.router({
-  findAll: t.procedure.input(paginationSchema).query(() => null as any),
-  findOne: t.procedure.input(workflowIdSchema).query(() => null as any),
-  create: t.procedure.input(createWorkflowSchema).mutation(() => null as any),
+  findAll: t.procedure.input(paginationSchema).output(workflowListOutputSchema).query(() => null as any),
+  findOne: t.procedure.input(workflowIdSchema).output(workflowDetailOutputSchema).query(() => null as any),
+  create: t.procedure.input(createWorkflowSchema).output(workflowOutputSchema).mutation(() => null as any),
   update: t.procedure
     .input(z.object({ id: z.string().cuid(), data: updateWorkflowSchema }))
+    .output(workflowOutputSchema)
     .mutation(() => null as any),
-  toggleActive: t.procedure.input(workflowIdSchema).mutation(() => null as any),
-  delete: t.procedure.input(workflowIdSchema).mutation(() => null as any),
-  simulate: t.procedure.input(simulateWorkflowSchema).mutation(() => null as any),
+  toggleActive: t.procedure.input(workflowIdSchema).output(workflowOutputSchema).mutation(() => null as any),
+  delete: t.procedure.input(workflowIdSchema).output(workflowOutputSchema).mutation(() => null as any),
+  simulate: t.procedure.input(simulateWorkflowSchema).output(simulateWorkflowOutputSchema).mutation(() => null as any),
 });
 
 const eventsRouter = t.router({
   findAll: t.procedure
     .input(z.object({ pagination: paginationSchema, filters: eventFilterSchema.optional() }))
+    .output(eventListOutputSchema)
     .query(() => null as any),
-  findOne: t.procedure.input(z.object({ id: z.string() })).query(() => null as any),
-  trigger: t.procedure.input(triggerEventSchema).mutation(() => null as any),
-  resolve: t.procedure.input(z.object({ id: z.string() })).mutation(() => null as any),
-  snooze: t.procedure.input(snoozeEventSchema).mutation(() => null as any),
-  addComment: t.procedure.input(addCommentSchema).mutation(() => null as any),
+  findOne: t.procedure.input(z.object({ id: z.string() })).output(eventDetailOutputSchema).query(() => null as any),
+  trigger: t.procedure.input(triggerEventSchema).output(eventOutputSchema).mutation(() => null as any),
+  resolve: t.procedure.input(z.object({ id: z.string() })).output(eventOutputSchema).mutation(() => null as any),
+  snooze: t.procedure.input(snoozeEventSchema).output(eventOutputSchema).mutation(() => null as any),
+  addComment: t.procedure.input(addCommentSchema).output(addCommentOutputSchema).mutation(() => null as any),
 });
 
 const notificationsRouter = t.router({
-  list: t.procedure.input(notificationListSchema).query(() => null as any),
-  unreadCount: t.procedure.query(() => null as any),
-  markAsRead: t.procedure.input(markNotificationReadSchema).mutation(() => null as any),
-  markAllAsRead: t.procedure.mutation(() => null as any),
+  list: t.procedure.input(notificationListSchema).output(notificationListOutputSchema).query(() => null as any),
+  unreadCount: t.procedure.output(unreadCountOutputSchema).query(() => null as any),
+  markAsRead: t.procedure.input(markNotificationReadSchema).output(notificationSchema.nullable()).mutation(() => null as any),
+  markAllAsRead: t.procedure.output(markAllAsReadOutputSchema).mutation(() => null as any),
 });
 
 const appRouter = t.router({

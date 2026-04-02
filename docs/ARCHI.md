@@ -107,7 +107,8 @@ workflow-manager/
 │           │   └── notifications/
 │           ├── components/         # Shared UI components (shadcn)
 │           ├── lib/
-│           │   └── trpc.ts         # tRPC client setup
+│           │   ├── trpc.ts         # tRPC client setup
+│           │   └── trpc-types.ts   # inferRouterOutputs<AppRouter> type aliases
 │           └── types/              # Shared TypeScript types
 │
 ├── packages/
@@ -252,7 +253,21 @@ export const createContext = (req: FastifyRequest) => ({
 - **Public procedures**: Login, registration, health check
 - **Protected procedures**: All workflow/event operations (JWT guard)
 - **Input validation**: Zod schemas on every mutation and parameterized query
+- **Output validation**: Zod output schemas on all 21 procedures via `@Query({ input, output })` / `@Mutation({ input, output })` decorators — runtime validation of return shapes
 - **Error handling**: tRPC error codes mapped to domain exceptions
+
+### Output Schema Design
+
+Output schemas live in `packages/shared/src/schemas/` alongside input schemas:
+
+- **Strict base schemas** (e.g., `workflowOutputSchema`) — fields returned by create/update/delete
+- **Extended schemas** (e.g., `workflowWithCountSchema`, `workflowDetailOutputSchema`) — add `_count`, `events`, etc. for list/detail views
+- All date fields use `z.coerce.date()` to handle both Prisma `Date` objects (backend) and ISO strings (frontend serialization)
+- JSON payload fields use `z.record(z.unknown())` instead of bare `z.unknown()`
+
+### Frontend Type Inference
+
+Frontend types are derived from the backend router via `inferRouterOutputs<AppRouter>` in `apps/frontend/src/lib/trpc-types.ts`. No manual type duplication — adding/changing an output schema automatically updates frontend types. The `@generated/index.ts` placeholder includes output schemas so type inference works without running the backend.
 
 ---
 
@@ -351,7 +366,7 @@ Server-Sent Events (SSE) for pushing live notifications to connected clients. Us
 ### Channels
 
 1. **In-app** - Real-time via SSE, persisted in `Notification` model for history
-2. **Email** - Via Resend through independent module (`features/resend/`), fire-and-forget with `Promise.allSettled`
+2. **Email** - Via Resend through independent module (`features/resend/`), fire-and-forget with `Promise.allSettled`. `ResendEmailService` throws `TRPCError` (not generic `Error`) for consistent error propagation.
 
 ### Architecture
 
@@ -413,13 +428,13 @@ Server-Sent Events (SSE) for pushing live notifications to connected clients. Us
 
 ## 15. State Management (Frontend)
 
-| State Type     | Solution                                          | Example                       |
-| -------------- | ------------------------------------------------- | ----------------------------- |
-| Server state   | tRPC + React Query (built-in)                     | Workflows list, event details |
-| Local UI state | `useState`                                        | Modal open/close, form inputs |
-| Global client  | Zustand (if needed)                               | Theme, sidebar collapsed      |
-| URL state      | Next.js searchParams                              | Filters, pagination           |
-| Real-time      | SSE subscription + React Query invalidation       | Live notifications            |
+| State Type     | Solution                                    | Example                       |
+| -------------- | ------------------------------------------- | ----------------------------- |
+| Server state   | tRPC + React Query (built-in)               | Workflows list, event details |
+| Local UI state | `useState`                                  | Modal open/close, form inputs |
+| Global client  | Zustand (if needed)                         | Theme, sidebar collapsed      |
+| URL state      | Next.js searchParams                        | Filters, pagination           |
+| Real-time      | SSE subscription + React Query invalidation | Live notifications            |
 
 ### Key Rule
 
@@ -533,9 +548,9 @@ sequenceDiagram
 
 ### Frontend
 
-- **tRPC error handling** via React Query's `onError` callbacks
-- **Error boundaries** around feature sections (not individual components)
-- **Toast notifications** for user-facing errors
+- **tRPC error handling** via global `onError` in QueryClient `mutationCache` defaults — shows toast (sonner) for all mutation failures
+- **Error boundaries** — `ErrorBoundary` class component (`src/components/error-boundary.component.tsx`) wraps the dashboard layout, catches render errors with fallback UI and retry button. Accepts optional custom `fallback` prop.
+- **Toast notifications** — `Toaster` component (sonner/shadcn) added to dashboard layout for user-facing error and success messages
 - **Loading/Error/Empty states** for every data-dependent component
 
 ---
