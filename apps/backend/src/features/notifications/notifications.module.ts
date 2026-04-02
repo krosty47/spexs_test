@@ -7,10 +7,7 @@ import { TrpcModule } from '../../trpc/trpc.module';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [
-    TrpcModule,
-    AuthModule,
-  ],
+  imports: [TrpcModule, AuthModule],
   controllers: [NotificationsController],
   providers: [NotificationsService, NotificationsRouter, JwtCookieGuard],
   exports: [NotificationsService, NotificationsRouter],

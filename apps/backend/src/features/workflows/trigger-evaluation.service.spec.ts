@@ -157,11 +157,7 @@ describe('TriggerEvaluationService', () => {
 
   describe('renderMessage', () => {
     it('should replace {{metric}} and {{value}} with actual values', () => {
-      const result = service.renderMessage(
-        'Alert: {{metric}} reached {{value}}%',
-        'cpu_usage',
-        95,
-      );
+      const result = service.renderMessage('Alert: {{metric}} reached {{value}}%', 'cpu_usage', 95);
       expect(result).toBe('Alert: cpu_usage reached 95%');
     });
 
@@ -185,11 +181,7 @@ describe('TriggerEvaluationService', () => {
     });
 
     it('should handle multiple occurrences of the same variable', () => {
-      const result = service.renderMessage(
-        '{{metric}} alert: {{metric}} = {{value}}',
-        'cpu',
-        95,
-      );
+      const result = service.renderMessage('{{metric}} alert: {{metric}} = {{value}}', 'cpu', 95);
       expect(result).toBe('cpu alert: cpu = 95');
     });
   });

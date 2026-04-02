@@ -67,11 +67,7 @@ function setupTriggerMocks(
     findFirstResult?: typeof mockEvent | null;
   } = {},
 ) {
-  const {
-    workflow = mockWorkflow,
-    historyUserId = 'system',
-    findFirstResult = null,
-  } = overrides;
+  const { workflow = mockWorkflow, historyUserId = 'system', findFirstResult = null } = overrides;
 
   const txMock = createTxMock();
   txMock.event.findFirst.mockResolvedValue(findFirstResult);
