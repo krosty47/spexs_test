@@ -15,6 +15,12 @@ export interface AppContextType {
   user: TrpcUser | null;
 }
 
+/** Safely extract a cookie value from the request object. */
+export function getCookie(ctx: AppContextType, name: string): string | undefined {
+  const cookies = (ctx.req as unknown as { cookies?: Record<string, string> }).cookies;
+  return cookies?.[name];
+}
+
 @Injectable()
 export class AppContext implements TRPCContext {
   constructor(private readonly jwtService: JwtService) {}
@@ -24,8 +30,7 @@ export class AppContext implements TRPCContext {
 
     try {
       // Extract JWT from httpOnly cookie
-      const cookies = (opts.req as unknown as { cookies?: Record<string, string> }).cookies;
-      const token = cookies?.access_token;
+      const token = getCookie({ req: opts.req } as AppContextType, 'access_token');
 
       if (token) {
         const payload = this.jwtService.verify(token);

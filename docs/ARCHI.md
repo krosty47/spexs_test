@@ -206,7 +206,7 @@ pnpm --filter prisma db:migrate    # Run migrations
 | `DATABASE_URL`       | PostgreSQL connection string    | -             |
 | `JWT_SECRET`         | JWT signing secret (min 32ch)   | -             |
 | `JWT_REFRESH_SECRET` | Refresh token secret            | -             |
-| `JWT_EXPIRATION`     | Access token TTL                | `15m`         |
+| `JWT_EXPIRATION`     | Access token TTL                | `1h`          |
 | `COOKIE_DOMAIN`      | httpOnly cookie domain          | `localhost`   |
 | `RESEND_API_KEY`     | Email provider API key          | -             |
 | `REDIS_URL`          | Redis connection (queues/cache) | -             |
@@ -262,7 +262,7 @@ export const createContext = (req: FastifyRequest) => ({
 
 - **Workflow** - Alert workflow definition (name, conditions, active status)
 - **Event** - Triggered alert instance (status: open/resolved/snoozed)
-- **EventHistory** - Audit log of event state changes
+- **EventHistory** - Audit log of event state changes (action: `EventAction` enum — CREATED, TRIGGERED, RESOLVED, SNOOZED, REOPENED)
 - **Comment** - User comments on events
 - **Snooze** - Snooze configuration per event
 - **User** - Application users with roles
@@ -291,8 +291,9 @@ export const createContext = (req: FastifyRequest) => ({
 1. User submits credentials → POST /auth/login
 2. Backend validates → issues JWT access + refresh tokens
 3. Tokens stored in httpOnly secure cookies
-4. Every request: cookie parsed → JWT verified → user injected into tRPC context
-5. Refresh: access token expired → refresh endpoint → new token pair → rotate refresh
+4. Every request: Next.js Middleware checks JWT exp → proactive refresh if expiring within 2 min
+5. Backend: cookie parsed → JWT verified → user injected into tRPC context
+6. If middleware refresh fails → redirect to /login
 ```
 
 ### Security Measures
@@ -300,7 +301,8 @@ export const createContext = (req: FastifyRequest) => ({
 - **httpOnly cookies** - Tokens not accessible via JavaScript (XSS protection)
 - **Secure flag** - Cookies only sent over HTTPS in production
 - **SameSite=Strict** - CSRF protection
-- **Short-lived access tokens** (15 min) with refresh rotation
+- **Short-lived access tokens** (1 hour) with refresh rotation
+- **Next.js Middleware** proactive token refresh — decodes JWT `exp`, refreshes server-side before expiry (2-min buffer), client never sees 401
 - **Password hashing** - bcrypt with cost factor >= 12
 
 ### Authorization

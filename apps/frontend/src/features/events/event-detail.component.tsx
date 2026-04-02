@@ -2,12 +2,14 @@
 
 import { useState } from 'react';
 import { trpc } from '@/lib/trpc';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/status-badge.component';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { ArrowLeft } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { SnoozeDialog } from './snooze-dialog.component';
 
 interface EventDetailProps {
   eventId: string;
@@ -15,21 +17,22 @@ interface EventDetailProps {
 
 export function EventDetail({ eventId }: EventDetailProps) {
   const [comment, setComment] = useState('');
-  const [snoozeUntil, setSnoozeUntil] = useState('');
-  const [snoozeReason, setSnoozeReason] = useState('');
+  const router = useRouter();
   const utils = trpc.useUtils();
 
   const eventQuery = trpc.events.findOne.useQuery({ id: eventId });
 
   const resolveMutation = trpc.events.resolve.useMutation({
-    onSuccess: () => utils.events.findOne.invalidate({ id: eventId }),
+    onSuccess: () => {
+      utils.events.findOne.invalidate({ id: eventId });
+      utils.events.findAll.invalidate();
+    },
   });
 
   const snoozeMutation = trpc.events.snooze.useMutation({
     onSuccess: () => {
       utils.events.findOne.invalidate({ id: eventId });
-      setSnoozeUntil('');
-      setSnoozeReason('');
+      utils.events.findAll.invalidate();
     },
   });
 
@@ -51,69 +54,51 @@ export function EventDetail({ eventId }: EventDetailProps) {
   const event = eventQuery.data;
   if (!event) return null;
 
+  const handleSnooze = (until: Date, reason?: string) => {
+    snoozeMutation.mutate({ id: eventId, until, reason });
+  };
+
   return (
     <div className="min-w-0 space-y-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <h2 className="truncate text-xl font-bold sm:text-2xl">{event.title}</h2>
-          <p className="text-sm text-[var(--muted-foreground)]">Workflow: {event.workflow.name}</p>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="mt-1 h-8 w-8 shrink-0"
+            onClick={() => router.push('/events')}
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h2 className="truncate text-xl font-bold sm:text-2xl">{event.title}</h2>
+              <StatusBadge status={event.status} />
+            </div>
+            <p className="mt-1 text-sm text-[var(--muted-foreground)]">Workflow: {event.workflow.name}</p>
+          </div>
         </div>
-        <Badge
-          className="w-fit"
-          variant={
-            event.status === 'OPEN'
-              ? 'destructive'
-              : event.status === 'RESOLVED'
-                ? 'default'
-                : 'secondary'
-          }
-        >
-          {event.status}
-        </Badge>
       </div>
 
       {/* Actions */}
       {event.status === 'OPEN' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Actions</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Button
-              onClick={() => resolveMutation.mutate({ id: eventId })}
-              disabled={resolveMutation.isPending}
-            >
-              {resolveMutation.isPending ? 'Resolving...' : 'Resolve Event'}
-            </Button>
-            <Separator />
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Snooze</p>
-              <Input
-                type="datetime-local"
-                value={snoozeUntil}
-                onChange={(e) => setSnoozeUntil(e.target.value)}
-              />
-              <Input
-                placeholder="Reason (optional)"
-                value={snoozeReason}
-                onChange={(e) => setSnoozeReason(e.target.value)}
-              />
+        <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Actions</CardTitle>
+            </CardHeader>
+            <CardContent>
               <Button
-                variant="secondary"
-                onClick={() =>
-                  snoozeMutation.mutate({
-                    id: eventId,
-                    until: new Date(snoozeUntil),
-                    reason: snoozeReason || undefined,
-                  })
-                }
-                disabled={!snoozeUntil || snoozeMutation.isPending}
+                onClick={() => resolveMutation.mutate({ id: eventId })}
+                disabled={resolveMutation.isPending}
               >
-                {snoozeMutation.isPending ? 'Snoozing...' : 'Snooze'}
+                {resolveMutation.isPending ? 'Resolving...' : 'Resolve Event'}
               </Button>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+
+          <SnoozeDialog onSnooze={handleSnooze} isPending={snoozeMutation.isPending} isSuccess={snoozeMutation.isSuccess} />
+        </div>
       )}
 
       {/* Payload */}
@@ -134,23 +119,29 @@ export function EventDetail({ eventId }: EventDetailProps) {
           <CardTitle>Comments ({event.comments.length})</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {event.comments.map(
-            (c: {
-              id: string;
-              content: string;
-              createdAt: string | Date;
-              user: { name: string };
-            }) => (
-              <div key={c.id} className="rounded-md border p-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium">{c.user.name}</p>
-                  <p className="text-xs text-[var(--muted-foreground)]">
-                    {new Date(c.createdAt).toLocaleString()}
-                  </p>
+          {event.comments.length === 0 ? (
+            <p className="text-sm text-[var(--muted-foreground)]">
+              No comments yet. Be the first to add one.
+            </p>
+          ) : (
+            event.comments.map(
+              (c: {
+                id: string;
+                content: string;
+                createdAt: string | Date;
+                user: { name: string };
+              }) => (
+                <div key={c.id} className="rounded-md border p-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium">{c.user.name}</p>
+                    <p className="text-xs text-[var(--muted-foreground)]">
+                      {new Date(c.createdAt).toLocaleString()}
+                    </p>
+                  </div>
+                  <p className="mt-1 text-sm">{c.content}</p>
                 </div>
-                <p className="mt-1 text-sm">{c.content}</p>
-              </div>
-            ),
+              ),
+            )
           )}
 
           <Separator />

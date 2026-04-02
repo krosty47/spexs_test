@@ -1,4 +1,4 @@
-import { PrismaClient, Role, EventStatus } from '@prisma/client';
+import { PrismaClient, Role, EventStatus, TriggerType } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -43,38 +43,62 @@ async function main() {
   });
 
   // Seed workflows
+  const workflow1Data = {
+    triggerType: TriggerType.THRESHOLD,
+    triggerConfig: { type: 'THRESHOLD', metric: 'cpu_usage', operator: '>', value: 90 },
+    outputMessage: 'Alert: {{metric}} reached {{value}}%',
+    recipients: [
+      { channel: 'IN_APP', destination: 'admin@workflow.dev' },
+      { channel: 'EMAIL', destination: 'admin@workflow.dev' },
+    ],
+  };
   const workflow1 = await prisma.workflow.upsert({
     where: { id: 'seed-workflow-1' },
-    update: {},
+    update: workflow1Data,
     create: {
       id: 'seed-workflow-1',
       name: 'CPU Usage Alert',
       description: 'Triggers when CPU usage exceeds 90%',
       isActive: true,
+      ...workflow1Data,
       userId: adminUser.id,
     },
   });
 
+  const workflow2Data = {
+    triggerType: TriggerType.VARIANCE,
+    triggerConfig: { type: 'VARIANCE', baseValue: 50, deviationPercentage: 70 },
+    outputMessage: '{{metric}} deviated to {{value}}, exceeding threshold',
+    recipients: [{ channel: 'IN_APP', destination: 'admin@workflow.dev' }],
+  };
   const workflow2 = await prisma.workflow.upsert({
     where: { id: 'seed-workflow-2' },
-    update: {},
+    update: workflow2Data,
     create: {
       id: 'seed-workflow-2',
       name: 'Memory Threshold',
       description: 'Triggers when memory usage exceeds 85%',
       isActive: true,
+      ...workflow2Data,
       userId: adminUser.id,
     },
   });
 
+  const workflow3Data = {
+    triggerType: TriggerType.THRESHOLD,
+    triggerConfig: { type: 'THRESHOLD', metric: 'disk_usage', operator: '>=', value: 95 },
+    outputMessage: 'Critical: {{metric}} is at {{value}}%',
+    recipients: [],
+  };
   const workflow3 = await prisma.workflow.upsert({
     where: { id: 'seed-workflow-3' },
-    update: {},
+    update: workflow3Data,
     create: {
       id: 'seed-workflow-3',
       name: 'Disk Space Monitor',
       description: 'Monitors disk space and alerts at 95% capacity',
       isActive: false,
+      ...workflow3Data,
       userId: regularUser.id,
     },
   });

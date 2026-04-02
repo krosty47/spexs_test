@@ -1,9 +1,10 @@
 import { Router, Query, Mutation, Input, Ctx, UseMiddlewares } from 'nestjs-trpc';
 import { loginSchema, registerSchema } from '@workflow-manager/shared';
 import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
 import { AuthService } from './auth.service';
 import { AuthMiddleware } from '../../trpc/auth.middleware';
-import type { AppContextType } from '../../trpc/context';
+import { type AppContextType, getCookie } from '../../trpc/context';
 
 @Router({ alias: 'auth' })
 export class AuthRouter {
@@ -23,9 +24,18 @@ export class AuthRouter {
     return result;
   }
 
-  @Mutation({ input: z.object({ refreshToken: z.string() }) })
-  async refresh(@Input() input: { refreshToken: string }, @Ctx() ctx: AppContextType) {
-    const result = await this.authService.refresh(input.refreshToken);
+  @Mutation({ input: z.object({ refreshToken: z.string().optional() }) })
+  async refresh(@Input() input: { refreshToken?: string }, @Ctx() ctx: AppContextType) {
+    const token = input.refreshToken || getCookie(ctx, 'refresh_token');
+
+    if (!token) {
+      throw new TRPCError({
+        code: 'UNAUTHORIZED',
+        message: 'No refresh token provided',
+      });
+    }
+
+    const result = await this.authService.refresh(token);
     this.setAuthCookies(ctx, result.accessToken, result.refreshToken);
     return result;
   }
@@ -46,7 +56,7 @@ export class AuthRouter {
       sameSite: 'lax',
       path: '/',
     };
-    res.setCookie('access_token', accessToken, { ...cookieOpts, maxAge: 15 * 60 });
+    res.setCookie('access_token', accessToken, { ...cookieOpts, maxAge: 60 * 60 });
     res.setCookie('refresh_token', refreshToken, { ...cookieOpts, maxAge: 7 * 24 * 60 * 60 });
   }
 }
