@@ -75,7 +75,9 @@ export function EventDetail({ eventId }: EventDetailProps) {
               <h2 className="truncate text-xl font-bold sm:text-2xl">{event.title}</h2>
               <StatusBadge status={event.status} />
             </div>
-            <p className="mt-1 text-sm text-[var(--muted-foreground)]">Workflow: {event.workflow.name}</p>
+            <p className="mt-1 text-sm text-[var(--muted-foreground)]">
+              Workflow: {event.workflow.name}
+            </p>
           </div>
         </div>
       </div>
@@ -97,7 +99,11 @@ export function EventDetail({ eventId }: EventDetailProps) {
             </CardContent>
           </Card>
 
-          <SnoozeDialog onSnooze={handleSnooze} isPending={snoozeMutation.isPending} isSuccess={snoozeMutation.isSuccess} />
+          <SnoozeDialog
+            onSnooze={handleSnooze}
+            isPending={snoozeMutation.isPending}
+            isSuccess={snoozeMutation.isSuccess}
+          />
         </div>
       )}
 

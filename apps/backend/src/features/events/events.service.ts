@@ -1,27 +1,32 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { TRPCError } from '@trpc/server';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import type {
-  TriggerEventInput,
-  SnoozeEventInput,
-  PaginationInput,
-  EventFilterInput,
+import { ResendEmailService } from '../resend/services/resend-email.service';
+import {
+  recipientSchema,
+  type TriggerEventInput,
+  type SnoozeEventInput,
+  type PaginationInput,
+  type EventFilterInput,
 } from '@workflow-manager/shared';
+import { z } from 'zod';
 
 @Injectable()
 export class EventsService {
   static readonly SYSTEM_USER_ID = 'system';
+  private readonly logger = new Logger(EventsService.name);
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
+    private readonly resendEmailService: ResendEmailService,
   ) {}
 
   async findAll(pagination: PaginationInput, filters?: EventFilterInput) {
     const skip = (pagination.page - 1) * pagination.limit;
-    const where: Record<string, unknown> = {};
+    const where: Prisma.EventWhereInput = {};
 
     if (filters?.status) {
       where.status = filters.status;
@@ -83,10 +88,10 @@ export class EventsService {
   async trigger(input: TriggerEventInput, triggeredBy?: string) {
     const userId = triggeredBy ?? EventsService.SYSTEM_USER_ID;
 
-    // Validate workflow exists and is active
+    // Validate workflow exists and is active, include recipients and owner for notifications
     const workflow = await this.prisma.workflow.findUnique({
       where: { id: input.workflowId },
-      select: { id: true, isActive: true },
+      select: { id: true, isActive: true, name: true, recipients: true, userId: true },
     });
 
     if (!workflow) {
@@ -139,12 +144,40 @@ export class EventsService {
       return created;
     });
 
-    // Notify after successful transaction
-    await this.notificationsService.notify(userId, 'event.triggered', {
+    // Notify via SSE after successful transaction (backward-compatible)
+    this.notificationsService.notify(userId, 'event.triggered', {
       eventId: event.id,
       title: event.title,
       workflowId: event.workflowId,
     });
+
+    // Create in-app notification for workflow owner
+    await this.notificationsService.send({
+      userId: workflow.userId,
+      type: 'EVENT_TRIGGERED',
+      title: `Event triggered: ${event.title}`,
+      body: `Workflow "${workflow.name}" triggered a new event.`,
+      metadata: { eventId: event.id, workflowId: event.workflowId },
+    });
+
+    // Send emails to EMAIL channel recipients (fire-and-forget)
+    const parsed = z.array(recipientSchema).safeParse(workflow.recipients ?? []);
+    const recipients = parsed.success ? parsed.data : [];
+    const emailRecipients = recipients.filter((r) => r.channel === 'EMAIL');
+
+    if (emailRecipients.length > 0) {
+      Promise.allSettled(
+        emailRecipients.map((r) =>
+          this.resendEmailService.send({
+            to: r.destination,
+            subject: `Alert: ${event.title}`,
+            html: `<h2>${event.title}</h2><p>Workflow "${workflow.name}" triggered a new event.</p>`,
+          }),
+        ),
+      ).catch((err) => {
+        this.logger.error('Unexpected error sending notification emails', err);
+      });
+    }
 
     return event;
   }

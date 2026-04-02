@@ -6,7 +6,13 @@ import type {
   Recipient,
 } from '@workflow-manager/shared';
 
-export type { CreateWorkflowInput, UpdateWorkflowInput, SimulateWorkflowResult, TriggerConfig, Recipient };
+export type {
+  CreateWorkflowInput,
+  UpdateWorkflowInput,
+  SimulateWorkflowResult,
+  TriggerConfig,
+  Recipient,
+};
 
 export interface Workflow {
   id: string;

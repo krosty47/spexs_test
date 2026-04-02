@@ -1,13 +1,25 @@
 # Changelog Table
 
-| Version | Week | Commit Message                                                                |
-| ------- | ---- | ----------------------------------------------------------------------------- |
-| `0.3.0` | 1    | feat: core domain model refinements, auth hardening, code review fixes        |
+| Version | Week | Commit Message                                                                                      |
+| ------- | ---- | --------------------------------------------------------------------------------------------------- |
+| `0.4.0` | 1    | feat: notifications system v0.4.0 - in-app notifications, SSE real-time delivery, email on trigger  |
+| `0.3.0` | 1    | feat: core domain model refinements, auth hardening, code review fixes                              |
 | `0.2.0` | 1    | feat: event trigger enhancements, snooze expiration cron, frontend pagination |
 | `0.1.0` | 1    | chore: initialize TRIP workflow                                               |
 
 # Changelog Summary
 
+- **v0.4.0 (Notifications System - Week 1, 02-04-2026)**:
+  - **Backend**: Notification model + NotificationType enum, user-scoped SSE via Map<userId, Subject[]>, NotificationsService.send() facade (persist + SSE)
+  - **Backend**: tRPC notifications router (list, unreadCount, markAsRead, markAllAsRead), JwtCookieGuard extracted to auth feature
+  - **Backend**: Event trigger creates in-app notification for workflow owner, fire-and-forget email via ResendEmailService
+  - **Backend**: markAsRead optimized to single updateMany, Prisma typed where clauses, JWT payload validation in guard
+  - **Frontend**: NotificationBell (Radix Popover) + NotificationDropdown with unread badge, relative timestamps, mark-as-read
+  - **Frontend**: Generic useSSE hook (SSR-safe, native auto-reconnect) + useNotifications wrapper with tRPC invalidation
+  - **Frontend**: Dashboard header visible on all screen sizes with notification bell
+  - **Database**: Notification model with composite [userId, isRead] index, 4 seed notifications
+  - **Shared**: Zod schemas for notification types, metadata, list input, mark-as-read (cuid validation)
+  - **Tests**: 102 backend tests pass (20 notification + 5 event trigger tests added)
 - **v0.3.0 (Core Domain Model v0.3.0 - Week 1, 02-04-2026)**:
   - **Backend**: JWT expiration 15m → 1h, explicit auth guards on routers, daily summary skip-when-unconfigured
   - **Backend**: EventHistory.action converted to Prisma enum, template vars standardized to {{metric}}/{{value}}

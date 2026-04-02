@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
+import { NotificationBell } from '@/features/notifications';
 
 const navItems = [
   { href: '/workflows', label: 'Workflows', icon: '⚡' },
@@ -78,25 +79,33 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Main content */}
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* Mobile header */}
-        <header className="flex items-center gap-3 border-b px-4 py-3 lg:hidden">
-          <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}>
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+        {/* Header with notification bell (all screen sizes) */}
+        <header className="flex items-center justify-between border-b px-4 py-3">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSidebarOpen(true)}
+              className="lg:hidden"
             >
-              <path d="M3 12h18" />
-              <path d="M3 6h18" />
-              <path d="M3 18h18" />
-            </svg>
-          </Button>
-          <span className="font-semibold">Workflow Manager</span>
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M3 12h18" />
+                <path d="M3 6h18" />
+                <path d="M3 18h18" />
+              </svg>
+            </Button>
+            <span className="font-semibold lg:hidden">Workflow Manager</span>
+          </div>
+          <NotificationBell />
         </header>
         <main className="flex min-h-0 flex-1 flex-col p-4 sm:p-6">{children}</main>
       </div>

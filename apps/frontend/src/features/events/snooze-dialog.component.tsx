@@ -64,8 +64,12 @@ export function SnoozeDialog({ onSnooze, isPending, isSuccess }: SnoozeDialogPro
 
   const hasSelection = selectedPreset !== null || (showCustom && customUntil);
   const selectionLabel = showCustom
-    ? customUntil ? new Date(customUntil).toLocaleString() : null
-    : selectedPreset !== null ? PRESETS[selectedPreset].label : null;
+    ? customUntil
+      ? new Date(customUntil).toLocaleString()
+      : null
+    : selectedPreset !== null
+      ? PRESETS[selectedPreset].label
+      : null;
 
   return (
     <Card>
@@ -88,11 +92,7 @@ export function SnoozeDialog({ onSnooze, isPending, isSuccess }: SnoozeDialogPro
                 {preset.label}
               </Button>
             ))}
-            <Button
-              variant={showCustom ? 'default' : 'outline'}
-              size="sm"
-              onClick={toggleCustom}
-            >
+            <Button variant={showCustom ? 'default' : 'outline'} size="sm" onClick={toggleCustom}>
               Custom
             </Button>
           </div>
@@ -124,11 +124,7 @@ export function SnoozeDialog({ onSnooze, isPending, isSuccess }: SnoozeDialogPro
         </div>
 
         {/* Confirm button */}
-        <Button
-          onClick={handleConfirm}
-          disabled={!hasSelection || isPending}
-          className="w-full"
-        >
+        <Button onClick={handleConfirm} disabled={!hasSelection || isPending} className="w-full">
           <Clock className="mr-2 h-4 w-4" />
           {isPending
             ? 'Snoozing...'

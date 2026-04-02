@@ -16,6 +16,8 @@ import {
   addCommentSchema,
   paginationSchema,
   eventFilterSchema,
+  notificationListSchema,
+  markNotificationReadSchema,
 } from '@workflow-manager/shared';
 
 const t = initTRPC.create();
@@ -52,10 +54,18 @@ const eventsRouter = t.router({
   addComment: t.procedure.input(addCommentSchema).mutation(() => null as any),
 });
 
+const notificationsRouter = t.router({
+  list: t.procedure.input(notificationListSchema).query(() => null as any),
+  unreadCount: t.procedure.query(() => null as any),
+  markAsRead: t.procedure.input(markNotificationReadSchema).mutation(() => null as any),
+  markAllAsRead: t.procedure.mutation(() => null as any),
+});
+
 const appRouter = t.router({
   auth: authRouter,
   workflows: workflowsRouter,
   events: eventsRouter,
+  notifications: notificationsRouter,
 });
 
 export type AppRouter = typeof appRouter;

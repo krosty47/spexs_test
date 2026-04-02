@@ -9,9 +9,9 @@ import { InjectionToken, ModuleMetadata, Type } from '@nestjs/common';
  */
 export interface ResendModuleOptions {
   /**
-   * Resend API key
+   * Resend API key (optional — email sending is disabled when not configured)
    */
-  apiKey: string;
+  apiKey?: string;
 
   /**
    * Default "from" email address
@@ -40,7 +40,8 @@ export interface ResendModuleAsyncOptions extends Pick<ModuleMetadata, 'imports'
    * Factory function to create options
    * Parameters are the injected dependencies
    */
-  useFactory?: (...args: unknown[]) => Promise<ResendModuleOptions> | ResendModuleOptions;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  useFactory?: (...args: any[]) => Promise<ResendModuleOptions> | ResendModuleOptions;
 
   /**
    * Class that implements ResendModuleOptionsFactory
