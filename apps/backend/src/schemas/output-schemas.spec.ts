@@ -11,6 +11,7 @@ import {
   notificationListOutputSchema,
   markAllAsReadOutputSchema,
   unreadCountOutputSchema,
+  addCommentSchema,
 } from '@workflow-manager/shared';
 
 describe('Output Schema Validation', () => {
@@ -333,6 +334,52 @@ describe('Output Schema Validation', () => {
     it('should validate unread count', () => {
       const result = unreadCountOutputSchema.safeParse({ count: 3 });
       expect(result.success).toBe(true);
+    });
+  });
+
+  // --- Comment Sanitization ---
+
+  describe('addCommentSchema content sanitization', () => {
+    it('should trim whitespace from content', () => {
+      const result = addCommentSchema.parse({
+        eventId: 'ev-1',
+        content: '  Hello world  ',
+      });
+      expect(result.content).toBe('Hello world');
+    });
+
+    it('should strip HTML tags from content', () => {
+      const result = addCommentSchema.parse({
+        eventId: 'ev-1',
+        content: 'Hello <script>alert("xss")</script>world',
+      });
+      expect(result.content).toBe('Hello alert("xss")world');
+    });
+
+    it('should reject empty string after trim', () => {
+      const result = addCommentSchema.safeParse({
+        eventId: 'ev-1',
+        content: '   ',
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject HTML-only content that becomes empty after stripping', () => {
+      const result = addCommentSchema.safeParse({
+        eventId: 'ev-1',
+        content: '<b></b><i></i>',
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('should preserve normal text without HTML', () => {
+      const result = addCommentSchema.parse({
+        eventId: 'ev-1',
+        content: 'This is a normal comment with some punctuation! And numbers: 123.',
+      });
+      expect(result.content).toBe(
+        'This is a normal comment with some punctuation! And numbers: 123.',
+      );
     });
   });
 });

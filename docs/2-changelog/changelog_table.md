@@ -1,8 +1,9 @@
 # Changelog Table
 
-| Version | Week | Commit Message                                                                                     |
-| ------- | ---- | -------------------------------------------------------------------------------------------------- |
-| `0.6.0` | 1    | feat: Nodemailer SMTP migration, HTML email templates, user selector, and IN_APP recipient routing |
+| Version | Week | Commit Message                                                                                                            |
+| ------- | ---- | ------------------------------------------------------------------------------------------------------------------------- |
+| `0.7.0` | 1    | feat: full-stack audit & hardening — Redis removal, security hardening, type safety, architecture, error handling, XSS    |
+| `0.6.0` | 1    | feat: Nodemailer SMTP migration, HTML email templates, user selector, and IN_APP recipient routing                        |
 | `0.5.0` | 1    | feat: end-to-end type safety improvements and error handling hardening                             |
 | `0.4.0` | 1    | feat: notifications system v0.4.0 - in-app notifications, SSE real-time delivery, email on trigger |
 | `0.3.0` | 1    | feat: core domain model refinements, auth hardening, code review fixes                             |
@@ -11,6 +12,16 @@
 
 # Changelog Summary
 
+- **v0.7.0 (Full-Stack Audit & Hardening - Week 1, 02-04-2026)**:
+  - **Infra**: Removed unused Redis from docker-compose, env files, and env validation
+  - **Backend**: 1MB body limit, Helmet CSP (disabled in dev), comma-separated CORS origins
+  - **Backend**: In-memory rate limiter tRPC middleware on auth endpoints (5 req/60s per IP)
+  - **Backend**: Extracted UsersService from UsersRouter (thin-router fix)
+  - **Backend**: GlobalExceptionFilter enhanced with NestJS Logger + production stack trace stripping
+  - **Backend**: Removed `[key: string]: unknown` from tRPC AppContextType
+  - **Shared**: addCommentSchema sanitization (trim + HTML strip + post-transform validation)
+  - **Frontend**: Removed inline type annotations (types inferred from tRPC queries)
+  - **Tests**: 148 backend tests pass (17 new: rate limiter, exception filter, users service, schema sanitization)
 - **v0.6.0 (Nodemailer & User Selector - Week 1, 02-04-2026)**:
   - **Backend**: Migrated from Resend (API-key) to Nodemailer (SMTP). Graceful degradation when SMTP unconfigured.
   - **Backend**: HTML email templates (event triggered, resolved, snoozed, daily summary) with shared baseLayout

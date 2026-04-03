@@ -7,15 +7,31 @@ import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter());
+  const isDev = process.env.NODE_ENV !== 'production';
 
-  // Security headers
-  await app.register(helmet);
+  const app = await NestFactory.create<NestFastifyApplication>(
+    AppModule,
+    new FastifyAdapter({ bodyLimit: 1_048_576 }), // 1 MB body limit
+  );
+
+  // Security headers — disable CSP in development to avoid blocking dev tools
+  await app.register(helmet, {
+    contentSecurityPolicy: isDev
+      ? false
+      : {
+          directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'"],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            imgSrc: ["'self'", 'data:'],
+          },
+        },
+  });
 
   // Register Fastify plugins
   await app.register(fastifyCookie);
   await app.register(fastifyCors, {
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+    origin: (process.env.CORS_ORIGIN || 'http://localhost:3000').split(',').map((o) => o.trim()),
     credentials: true,
   });
 

@@ -7,7 +7,6 @@ A full-stack alert workflow management app built with a pnpm monorepo.
 | Frontend | Next.js 15, React 19, tRPC, shadcn/ui, Tailwind CSS |
 | Backend  | NestJS 10, Fastify, tRPC, Passport JWT              |
 | Database | PostgreSQL 16, Prisma ORM                           |
-| Cache    | Redis 7                                             |
 | Tooling  | pnpm workspaces, Turborepo, TypeScript 5            |
 
 ## Prerequisites
@@ -50,7 +49,6 @@ This starts:
 | Service    | Port |
 | ---------- | ---- |
 | PostgreSQL | 5433 |
-| Redis      | 6380 |
 
 ### 4. Set up the database
 
@@ -94,7 +92,7 @@ Use one of the seeded accounts:
 ├── packages/
 │   ├── prisma/           # Prisma schema, migrations, seed
 │   └── shared/           # Shared Zod schemas and types
-├── docker-compose.yml    # PostgreSQL + Redis
+├── docker-compose.yml    # PostgreSQL
 ├── turbo.json            # Turborepo pipeline config
 └── pnpm-workspace.yaml   # Workspace definition
 ```
@@ -125,8 +123,6 @@ See [`.env.example`](.env.example) for all available variables:
 | `JWT_SECRET`              | Access token signing key (32+ ch)  | -                        |
 | `JWT_REFRESH_SECRET`      | Refresh token signing key (32+ ch) | -                        |
 | `JWT_EXPIRATION`          | Access token TTL                   | `15m`                    |
-| `REDIS_URL`               | Redis connection string            | `redis://localhost:6380` |
-| `REDIS_PASSWORD`          | Redis authentication password      | `redisdevpass`           |
 | `SMTP_HOST`               | SMTP server hostname (optional)    | -                        |
 | `SMTP_PORT`               | SMTP server port                   | `587`                    |
 | `SMTP_SECURE`             | Use TLS for SMTP                   | `false`                  |
@@ -139,4 +135,4 @@ See [`.env.example`](.env.example) for all available variables:
 
 ## Version
 
-Current version: **0.6.0** — See [changelog](docs/2-changelog/w1_v0.6.0.md) for details.
+Current version: **0.7.0** — See [changelog](docs/2-changelog/w1_v0.7.0.md) for details.

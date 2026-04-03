@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { AuthService } from './auth.service';
 import { AuthMiddleware } from '../../trpc/auth.middleware';
+import { RateLimitMiddleware } from '../../trpc/rate-limit.middleware';
 import { type AppContextType, getCookie } from '../../trpc/context';
 
 @Router({ alias: 'auth' })
@@ -16,6 +17,7 @@ export class AuthRouter {
   constructor(private readonly authService: AuthService) {}
 
   @Mutation({ input: loginSchema, output: authOutputSchema })
+  @UseMiddlewares(RateLimitMiddleware)
   async login(@Input() input: z.infer<typeof loginSchema>, @Ctx() ctx: AppContextType) {
     const result = await this.authService.login(input);
     this.setAuthCookies(ctx, result.accessToken, result.refreshToken);
@@ -23,6 +25,7 @@ export class AuthRouter {
   }
 
   @Mutation({ input: registerSchema, output: authOutputSchema })
+  @UseMiddlewares(RateLimitMiddleware)
   async register(@Input() input: z.infer<typeof registerSchema>, @Ctx() ctx: AppContextType) {
     const result = await this.authService.register(input);
     this.setAuthCookies(ctx, result.accessToken, result.refreshToken);
@@ -30,6 +33,7 @@ export class AuthRouter {
   }
 
   @Mutation({ input: z.object({ refreshToken: z.string().optional() }), output: authOutputSchema })
+  @UseMiddlewares(RateLimitMiddleware)
   async refresh(@Input() input: { refreshToken?: string }, @Ctx() ctx: AppContextType) {
     const token = input.refreshToken || getCookie(ctx, 'refresh_token');
 

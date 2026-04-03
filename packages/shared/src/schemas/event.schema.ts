@@ -33,7 +33,13 @@ export type SnoozeEventInput = z.infer<typeof snoozeEventSchema>;
 
 export const addCommentSchema = z.object({
   eventId: z.string().min(1),
-  content: z.string().min(1).max(2000),
+  content: z
+    .string()
+    .trim()
+    .min(1, 'Comment cannot be empty')
+    .max(2000)
+    .transform((val) => val.replace(/<[^>]*>/g, ''))
+    .pipe(z.string().min(1, 'Comment cannot be empty')),
 });
 
 export type AddCommentInput = z.infer<typeof addCommentSchema>;

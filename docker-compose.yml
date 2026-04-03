@@ -17,21 +17,5 @@ services:
       timeout: 5s
       retries: 5
 
-  redis:
-    image: redis:7-alpine
-    container_name: wm-redis
-    restart: unless-stopped
-    ports:
-      - '6380:6379'
-    command: redis-server --requirepass ${REDIS_PASSWORD:-redisdevpass}
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ['CMD', 'redis-cli', '-a', '${REDIS_PASSWORD:-redisdevpass}', 'ping']
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
 volumes:
   postgres_data:
-  redis_data:

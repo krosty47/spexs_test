@@ -38,5 +38,6 @@ coverage/
 
 # Misc
 *.tsbuildinfo
+CLAUDE_CODE_AUDIT_PROMPT.md
 
 .claude/
