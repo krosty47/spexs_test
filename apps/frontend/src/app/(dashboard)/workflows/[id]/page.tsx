@@ -22,7 +22,17 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ArrowLeft, Bell, Mail, MoreVertical, Pencil, Power, PowerOff, Trash2, X } from 'lucide-react';
+import {
+  ArrowLeft,
+  Bell,
+  Mail,
+  MoreVertical,
+  Pencil,
+  Power,
+  PowerOff,
+  Trash2,
+  X,
+} from 'lucide-react';
 import Link from 'next/link';
 import { SimulateTrigger } from '@/features/workflows/simulate-trigger.component';
 import { WorkflowForm } from '@/features/workflows/workflow-form.component';
@@ -101,19 +111,12 @@ function WorkflowDetailSkeleton() {
 export default function WorkflowDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const utils = trpc.useUtils();
   const [isEditing, setIsEditing] = useState(false);
 
   const workflowQuery = trpc.workflows.findOne.useQuery({ id: params.id });
-  const toggleMutation = trpc.workflows.toggleActive.useMutation({
-    onSuccess: () => {
-      utils.workflows.findOne.invalidate({ id: params.id });
-      utils.workflows.findAll.invalidate();
-    },
-  });
+  const toggleMutation = trpc.workflows.toggleActive.useMutation();
   const deleteMutation = trpc.workflows.delete.useMutation({
     onSuccess: () => {
-      utils.workflows.findAll.invalidate();
       router.push('/workflows');
     },
   });
@@ -246,15 +249,15 @@ export default function WorkflowDetailPage() {
           )}
 
           {/* Simulate Trigger */}
-          {hasTriggerConfig && <SimulateTrigger workflowId={workflow.id} />}
+          {hasTriggerConfig && (
+            <SimulateTrigger workflowId={workflow.id} isActive={workflow.isActive} />
+          )}
 
           {/* Recipients */}
           <Card>
             <CardHeader>
               <CardTitle>Recipients</CardTitle>
-              <CardDescription>
-                Users notified when this workflow triggers
-              </CardDescription>
+              <CardDescription>Users notified when this workflow triggers</CardDescription>
             </CardHeader>
             <CardContent>
               {recipients.length > 0 ? (

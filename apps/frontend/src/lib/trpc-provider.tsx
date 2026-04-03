@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { trpc, getTrpcClient } from './trpc';
+import { trpc, getTrpcClient, INVALIDATE_NAMESPACES } from './trpc';
 
 interface TrpcProviderProps {
   children: React.ReactNode;
@@ -15,10 +15,15 @@ export function TrpcProvider({ children }: TrpcProviderProps) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: 5 * 60 * 1000,
+            staleTime: 0,
             refetchOnWindowFocus: false,
           },
           mutations: {
+            onSuccess: () => {
+              for (const ns of INVALIDATE_NAMESPACES) {
+                queryClient.invalidateQueries({ queryKey: [[ns]] });
+              }
+            },
             onError: (error) => {
               toast.error(error.message || 'An unexpected error occurred');
             },

@@ -162,6 +162,13 @@ export class WorkflowsService {
       });
     }
 
+    if (!workflow.isActive) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Cannot simulate an inactive workflow. Activate it first.',
+      });
+    }
+
     if (!workflow.triggerConfig) {
       throw new TRPCError({
         code: 'BAD_REQUEST',

@@ -28,9 +28,11 @@ export function WorkflowForm({ initialData }: WorkflowFormProps = {}) {
   const { form, recipientsField, onSubmit, isLoading, error, isEditMode } = useWorkflowForm({
     initialData,
   });
-  const { data: appConfig } = trpc.config.getFeatures.useQuery();
+  const { data: appConfig } = trpc.config.getFeatures.useQuery(undefined, {
+    staleTime: 10 * 60 * 1000,
+  });
   const emailEnabled = appConfig?.emailEnabled ?? false;
-  const { data: users } = trpc.users.list.useQuery();
+  const { data: users } = trpc.users.list.useQuery(undefined, { staleTime: 5 * 60 * 1000 });
   const {
     register,
     watch,

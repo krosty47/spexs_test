@@ -34,7 +34,6 @@ export function HistoryList() {
   const [statusFilter, setStatusFilter] = useState<EventStatus | undefined>(undefined);
   const [workflowFilter, setWorkflowFilter] = useState<string | undefined>(undefined);
   const limit = 15;
-  const utils = trpc.useUtils();
 
   const workflowsQuery = trpc.workflows.findAll.useQuery({ page: 1, limit: 100 });
 
@@ -46,11 +45,7 @@ export function HistoryList() {
     },
   });
 
-  const resolveMutation = trpc.events.resolve.useMutation({
-    onSuccess: () => {
-      utils.events.findAll.invalidate();
-    },
-  });
+  const resolveMutation = trpc.events.resolve.useMutation();
 
   const totalPages = eventsQuery.data?.totalPages ?? 1;
 

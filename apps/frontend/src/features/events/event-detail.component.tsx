@@ -94,27 +94,14 @@ interface EventDetailProps {
 export function EventDetail({ eventId }: EventDetailProps) {
   const [comment, setComment] = useState('');
   const router = useRouter();
-  const utils = trpc.useUtils();
-
   const eventQuery = trpc.events.findOne.useQuery({ id: eventId });
 
-  const resolveMutation = trpc.events.resolve.useMutation({
-    onSuccess: () => {
-      utils.events.findOne.invalidate({ id: eventId });
-      utils.events.findAll.invalidate();
-    },
-  });
+  const resolveMutation = trpc.events.resolve.useMutation();
 
-  const snoozeMutation = trpc.events.snooze.useMutation({
-    onSuccess: () => {
-      utils.events.findOne.invalidate({ id: eventId });
-      utils.events.findAll.invalidate();
-    },
-  });
+  const snoozeMutation = trpc.events.snooze.useMutation();
 
   const addCommentMutation = trpc.events.addComment.useMutation({
     onSuccess: () => {
-      utils.events.findOne.invalidate({ id: eventId });
       setComment('');
     },
   });

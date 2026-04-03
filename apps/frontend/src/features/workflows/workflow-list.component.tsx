@@ -30,19 +30,14 @@ function WorkflowListSkeleton() {
 }
 
 export function WorkflowList() {
-  const utils = trpc.useUtils();
   const workflowsQuery = trpc.workflows.findAll.useQuery({
     page: 1,
     limit: 20,
   });
 
-  const toggleMutation = trpc.workflows.toggleActive.useMutation({
-    onSuccess: () => utils.workflows.findAll.invalidate(),
-  });
+  const toggleMutation = trpc.workflows.toggleActive.useMutation();
 
-  const deleteMutation = trpc.workflows.delete.useMutation({
-    onSuccess: () => utils.workflows.findAll.invalidate(),
-  });
+  const deleteMutation = trpc.workflows.delete.useMutation();
 
   if (workflowsQuery.isLoading) {
     return <WorkflowListSkeleton />;
