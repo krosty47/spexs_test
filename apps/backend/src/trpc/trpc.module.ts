@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TRPCModule } from 'nestjs-trpc';
 import { AppContext } from './context';
 import { AuthMiddleware } from './auth.middleware';
+import { RateLimitMiddleware } from './rate-limit.middleware';
 
 @Module({
   imports: [
@@ -21,7 +22,7 @@ import { AuthMiddleware } from './auth.middleware';
       context: AppContext,
     }),
   ],
-  providers: [AppContext, AuthMiddleware],
-  exports: [AuthMiddleware],
+  providers: [AppContext, AuthMiddleware, RateLimitMiddleware],
+  exports: [AuthMiddleware, RateLimitMiddleware],
 })
 export class TrpcModule {}

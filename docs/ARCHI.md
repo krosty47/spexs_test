@@ -63,6 +63,7 @@ Workflow Manager is a full-stack application for creating and managing alert wor
 | **Monorepo**         | Turborepo + pnpm        | latest  | Build orchestration + package manager |
 | **Styling**          | Tailwind CSS            | 4.x     | Utility-first CSS                     |
 | **UI Kit**           | shadcn/ui               | latest  | Radix UI-based component library      |
+| **Security**         | @fastify/helmet         | latest  | HTTP security headers (CSP, etc.)     |
 | **Containerization** | Docker + Docker Compose | -       | Local development environment         |
 
 ---
@@ -130,7 +131,7 @@ workflow-manager/
 │   ├── 4-unit-tests/
 │   └── 6-memo/
 │
-├── docker-compose.yml              # PostgreSQL + Redis (dev)
+├── docker-compose.yml              # PostgreSQL (dev)
 ├── turbo.json                      # Turborepo pipeline config
 ├── package.json                    # Root workspace config
 ├── GUIA_DE_DESARROLLO.md           # Development guide (Spanish)
@@ -217,7 +218,6 @@ pnpm --filter prisma db:migrate    # Run migrations
 | `SMTP_USER`          | SMTP auth username (optional)   | -                      |
 | `SMTP_PASS`          | SMTP auth password (optional)   | -                      |
 | `SMTP_FROM`          | Default sender email address    | `noreply@workflow.dev` |
-| `REDIS_URL`          | Redis connection (queues/cache) | -                      |
 | `NODE_ENV`           | Environment                     | `development`          |
 
 ### Configuration Approach
@@ -424,7 +424,7 @@ HTML email templates in `features/mailer/templates/` use table-based layouts for
 
 ### Future: Queue-Based Jobs
 
-- BullMQ + Redis for async job processing (email sending, heavy computations)
+- BullMQ + Redis for async job processing (not currently deployed)
 - Exponential backoff for retries
 - Dead letter queue for permanently failed jobs
 
@@ -617,9 +617,10 @@ sequenceDiagram
 
 - **httpOnly JWT cookies** - Tokens never exposed to JavaScript
 - **Zod validation** on every tRPC input - reject malformed data at the boundary
-- **CORS** - Strict origin whitelist (never `*` in production)
-- **Helmet** - Secure HTTP headers via Fastify plugin
-- **Rate limiting** - Stricter on auth endpoints
+- **CORS** - Strict origin whitelist from `CORS_ORIGIN` env var (comma-separated, never `*` in production)
+- **Helmet** - Secure HTTP headers via `@fastify/helmet` with CSP directives (disabled in development)
+- **Rate limiting** - In-memory tRPC middleware on auth endpoints (5 req/60s per IP), periodic cleanup of expired entries
+- **Body limit** - 1MB max request body via Fastify adapter
 - **Parameterized queries** - Prisma handles SQL injection prevention
 - **Environment secrets** - Never hardcoded, loaded from env vars
 - **CSRF protection** - SameSite cookies + optional CSRF token for mutations
@@ -632,7 +633,7 @@ sequenceDiagram
 ### Development
 
 ```bash
-docker compose up -d    # PostgreSQL + Redis
+docker compose up -d    # PostgreSQL
 pnpm install
 pnpm dev                # Runs both apps via Turborepo
 ```

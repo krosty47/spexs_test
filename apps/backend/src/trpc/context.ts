@@ -9,7 +9,6 @@ export interface TrpcUser {
 }
 
 export interface AppContextType {
-  [key: string]: unknown;
   req: ContextOptions['req'];
   res: ContextOptions['res'];
   user: TrpcUser | null;
@@ -27,7 +26,7 @@ export function getCookie(ctx: AppContextType, name: string): string | undefined
 export class AppContext implements TRPCContext {
   constructor(private readonly jwtService: JwtService) {}
 
-  async create(opts: ContextOptions): Promise<AppContextType> {
+  async create(opts: ContextOptions): Promise<Record<string, unknown>> {
     let user: TrpcUser | null = null;
 
     try {
@@ -46,6 +45,7 @@ export class AppContext implements TRPCContext {
       // Invalid or expired token - user remains null
     }
 
-    return { req: opts.req, res: opts.res, user };
+    // Return type satisfies TRPCContext interface; consumers cast to AppContextType
+    return { req: opts.req, res: opts.res, user } satisfies AppContextType;
   }
 }

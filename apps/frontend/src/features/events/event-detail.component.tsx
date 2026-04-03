@@ -130,24 +130,17 @@ export function EventDetail({ eventId }: EventDetailProps) {
               No comments yet. Be the first to add one.
             </p>
           ) : (
-            event.comments.map(
-              (c: {
-                id: string;
-                content: string;
-                createdAt: string | Date;
-                user: { name: string };
-              }) => (
-                <div key={c.id} className="rounded-md border p-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium">{c.user.name}</p>
-                    <p className="text-xs text-[var(--muted-foreground)]">
-                      {new Date(c.createdAt).toLocaleString()}
-                    </p>
-                  </div>
-                  <p className="mt-1 text-sm">{c.content}</p>
+            event.comments.map((c) => (
+              <div key={c.id} className="rounded-md border p-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium">{c.user.name}</p>
+                  <p className="text-xs text-[var(--muted-foreground)]">
+                    {new Date(c.createdAt).toLocaleString()}
+                  </p>
                 </div>
-              ),
-            )
+                <p className="mt-1 text-sm">{c.content}</p>
+              </div>
+            ))
           )}
 
           <Separator />
@@ -179,27 +172,20 @@ export function EventDetail({ eventId }: EventDetailProps) {
             <p className="text-[var(--muted-foreground)]">No history</p>
           ) : (
             <div className="space-y-2">
-              {event.history.map(
-                (h: {
-                  id: string;
-                  action: string;
-                  createdAt: string | Date;
-                  user: { name: string };
-                }) => (
-                  <div
-                    key={h.id}
-                    className="flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <span>
-                      <span className="font-medium">{h.user.name}</span> {h.action.toLowerCase()}{' '}
-                      this event
-                    </span>
-                    <span className="text-xs text-[var(--muted-foreground)] sm:text-sm">
-                      {new Date(h.createdAt).toLocaleString()}
-                    </span>
-                  </div>
-                ),
-              )}
+              {event.history.map((h) => (
+                <div
+                  key={h.id}
+                  className="flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <span>
+                    <span className="font-medium">{h.user.name}</span> {h.action.toLowerCase()} this
+                    event
+                  </span>
+                  <span className="text-xs text-[var(--muted-foreground)] sm:text-sm">
+                    {new Date(h.createdAt).toLocaleString()}
+                  </span>
+                </div>
+              ))}
             </div>
           )}
         </CardContent>
