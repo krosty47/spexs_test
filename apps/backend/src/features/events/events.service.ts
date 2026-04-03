@@ -376,8 +376,7 @@ export class EventsService {
     emailSubject: string;
     emailHtml: string;
   }) {
-    const { event, workflow, userId, type, sseEvent, title, body, emailSubject, emailHtml } =
-      params;
+    const { event, workflow, type, sseEvent, title, body, emailSubject, emailHtml } = params;
     const recipients = parseRecipients(workflow.recipients);
 
     // In-app notifications to owner + IN_APP recipients

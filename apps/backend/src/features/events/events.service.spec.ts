@@ -207,7 +207,12 @@ describe('EventsService', () => {
       });
 
       expect(notificationsService.notify).toHaveBeenCalledWith(
-        'system',
+        'user-1',
+        'event.triggered',
+        expect.objectContaining({ eventId: 'evt-1' }),
+      );
+      expect(notificationsService.notify).toHaveBeenCalledWith(
+        'user-2',
         'event.triggered',
         expect.objectContaining({ eventId: 'evt-1' }),
       );

@@ -24,7 +24,7 @@ cp .env.example .env
 # Edit .env → set JWT_SECRET and JWT_REFRESH_SECRET (32+ characters each)
 
 # 3. Start PostgreSQL + Mailpit
-docker compose up -d
+docker-compose up -d
 
 # 4. Set up the database
 pnpm db:generate && pnpm db:push && pnpm db:seed
@@ -35,11 +35,11 @@ pnpm dev
 
 Once running, open **http://localhost:3000** in your browser.
 
-| Service  | URL                    | Description              |
-| -------- | ---------------------- | ------------------------ |
-| Frontend | http://localhost:3000   | Web application          |
-| Backend  | http://localhost:4000   | API server               |
-| Mailpit  | http://localhost:8025   | Email inbox (catches all outbound emails) |
+| Service  | URL                   | Description                               |
+| -------- | --------------------- | ----------------------------------------- |
+| Frontend | http://localhost:3000 | Web application                           |
+| Backend  | http://localhost:4000 | API server                                |
+| Mailpit  | http://localhost:8025 | Email inbox (catches all outbound emails) |
 
 ---
 
@@ -105,16 +105,19 @@ The seed creates 16 workflows, 25 events, notifications, comments, and snooze re
 Navigate to the **Events** page to see all events. Use the filters to narrow by **status** (Open / Resolved / Snoozed) or by **workflow**.
 
 **Resolve an event:**
+
 1. Click an open event to see its details
 2. Click **Resolve** — the status changes and a notification is sent
 
 **Snooze an event:**
+
 1. Click an open event
 2. Click **Snooze** and pick a duration/time
 3. The event status changes to SNOOZED
 4. When the snooze expires, the event automatically reopens (via cron job every 15 minutes + precise setTimeout)
 
 **Add a comment:**
+
 1. Open any event's detail page
 2. Write a comment in the text field and submit
 3. The comment appears in the event's timeline
@@ -198,16 +201,16 @@ To test the full real-time experience:
 
 See [`.env.example`](.env.example) for all variables. Key ones:
 
-| Variable                  | Description                        | Default                  |
-| ------------------------- | ---------------------------------- | ------------------------ |
-| `DATABASE_URL`            | PostgreSQL connection string       | (see .env.example)       |
-| `JWT_SECRET`              | Access token signing key (32+ ch)  | —                        |
-| `JWT_REFRESH_SECRET`      | Refresh token signing key (32+ ch) | —                        |
-| `SMTP_HOST`               | SMTP server hostname               | `localhost`              |
-| `SMTP_PORT`               | SMTP server port                   | `1025`                   |
-| `CORS_ORIGIN`             | Allowed frontend origin            | `http://localhost:3000`  |
-| `NEXT_PUBLIC_BACKEND_URL` | Backend URL for the frontend       | `http://localhost:4000`  |
-| `SNOOZE_CRON`             | Snooze expiration check interval   | `*/15 * * * *`           |
+| Variable                  | Description                        | Default                 |
+| ------------------------- | ---------------------------------- | ----------------------- |
+| `DATABASE_URL`            | PostgreSQL connection string       | (see .env.example)      |
+| `JWT_SECRET`              | Access token signing key (32+ ch)  | —                       |
+| `JWT_REFRESH_SECRET`      | Refresh token signing key (32+ ch) | —                       |
+| `SMTP_HOST`               | SMTP server hostname               | `localhost`             |
+| `SMTP_PORT`               | SMTP server port                   | `1025`                  |
+| `CORS_ORIGIN`             | Allowed frontend origin            | `http://localhost:3000` |
+| `NEXT_PUBLIC_BACKEND_URL` | Backend URL for the frontend       | `http://localhost:4000` |
+| `SNOOZE_CRON`             | Snooze expiration check interval   | `*/15 * * * *`          |
 
 ## Version
 
