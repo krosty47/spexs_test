@@ -51,6 +51,7 @@ function formatRelativeTime(date: Date | string): string {
  */
 export const NotificationDropdown = ({ onClose }: NotificationDropdownProps): React.ReactNode => {
   const router = useRouter();
+  const utils = trpc.useUtils();
 
   const { data, isLoading } = trpc.notifications.list.useQuery({
     page: 1,
@@ -58,9 +59,19 @@ export const NotificationDropdown = ({ onClose }: NotificationDropdownProps): Re
     unreadOnly: false,
   });
 
-  const markAsReadMutation = trpc.notifications.markAsRead.useMutation();
+  const markAsReadMutation = trpc.notifications.markAsRead.useMutation({
+    onSuccess: () => {
+      void utils.notifications.list.invalidate();
+      void utils.notifications.unreadCount.invalidate();
+    },
+  });
 
-  const markAllAsReadMutation = trpc.notifications.markAllAsRead.useMutation();
+  const markAllAsReadMutation = trpc.notifications.markAllAsRead.useMutation({
+    onSuccess: () => {
+      void utils.notifications.list.invalidate();
+      void utils.notifications.unreadCount.invalidate();
+    },
+  });
 
   const notifications: NotificationItem[] = data?.data ?? [];
 

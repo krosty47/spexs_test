@@ -238,6 +238,19 @@ describe('EventsService', () => {
       ).rejects.toMatchObject({ code: 'CONFLICT' });
     });
 
+    it('should reject trigger when a snoozed event exists for same workflow', async () => {
+      const snoozedEvent = { ...mockEvent, id: 'evt-snoozed', status: 'SNOOZED' as const };
+      setupTriggerMocks(prisma, { findFirstResult: snoozedEvent });
+
+      await expect(
+        service.trigger({
+          title: 'Duplicate Event',
+          payload: {},
+          workflowId: 'wf-1',
+        }),
+      ).rejects.toMatchObject({ code: 'CONFLICT' });
+    });
+
     it('should send email to EMAIL channel recipients (fire-and-forget)', async () => {
       setupTriggerMocks(prisma);
 

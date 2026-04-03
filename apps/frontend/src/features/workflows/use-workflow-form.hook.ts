@@ -23,6 +23,7 @@ interface UseWorkflowFormOptions {
 
 export function useWorkflowForm(options?: UseWorkflowFormOptions) {
   const router = useRouter();
+  const utils = trpc.useUtils();
   const isEditMode = !!options?.initialData;
 
   const form = useForm<CreateWorkflowInput>({
@@ -55,12 +56,17 @@ export function useWorkflowForm(options?: UseWorkflowFormOptions) {
 
   const createMutation = trpc.workflows.create.useMutation({
     onSuccess: () => {
+      utils.workflows.findAll.invalidate();
       router.push('/workflows');
     },
   });
 
   const updateMutation = trpc.workflows.update.useMutation({
     onSuccess: () => {
+      utils.workflows.findAll.invalidate();
+      if (options?.initialData?.id) {
+        utils.workflows.findOne.invalidate({ id: options.initialData.id });
+      }
       router.push('/workflows');
     },
   });

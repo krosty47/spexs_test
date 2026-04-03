@@ -46,16 +46,21 @@ export class WorkflowsService {
   }
 
   async findOne(id: string, currentUser: { id: string; email: string }) {
-    const workflow = await this.prisma.workflow.findUnique({
-      where: { id },
-      include: {
-        events: {
-          take: 10,
-          orderBy: { createdAt: 'desc' },
+    const [workflow, unresolvedCount] = await Promise.all([
+      this.prisma.workflow.findUnique({
+        where: { id },
+        include: {
+          events: {
+            take: 10,
+            orderBy: { updatedAt: 'desc' },
+          },
+          _count: { select: { events: true } },
         },
-        _count: { select: { events: true } },
-      },
-    });
+      }),
+      this.prisma.event.count({
+        where: { workflowId: id, status: { in: ['OPEN', 'SNOOZED'] } },
+      }),
+    ]);
 
     if (!workflow) {
       throw new TRPCError({
@@ -67,6 +72,7 @@ export class WorkflowsService {
     return {
       ...workflow,
       recipients: this.filterSelfRecipients(workflow.recipients, currentUser),
+      hasUnresolvedEvent: unresolvedCount > 0,
     };
   }
 
@@ -150,6 +156,7 @@ export class WorkflowsService {
     metricValue: number,
     userId: string,
     dryRun: boolean,
+    eventTitle?: string,
   ): Promise<SimulateWorkflowResult> {
     const workflow = await this.prisma.workflow.findUnique({
       where: { id },
@@ -190,22 +197,14 @@ export class WorkflowsService {
 
     // If triggered and not a dry run, create the event
     if (triggered && !dryRun) {
-      try {
-        await this.eventsService.trigger(
-          {
-            workflowId: id,
-            title: message,
-            payload: { metricValue, details, simulatedBy: userId },
-          },
-          userId,
-        );
-      } catch (error) {
-        // Handle CONFLICT (duplicate open event) gracefully
-        if (error instanceof TRPCError && error.code === 'CONFLICT') {
-          return { triggered, message, details, dryRun, alreadyOpen: true };
-        }
-        throw error;
-      }
+      await this.eventsService.trigger(
+        {
+          workflowId: id,
+          title: eventTitle || message,
+          payload: { metricValue, details, simulatedBy: userId },
+        },
+        userId,
+      );
     }
 
     return { triggered, message, details, dryRun };

@@ -340,21 +340,46 @@ describe('WorkflowsService', () => {
       expect(eventsService.trigger).not.toHaveBeenCalled();
     });
 
-    it('should handle CONFLICT from duplicate open event gracefully', async () => {
+    it('should propagate CONFLICT when an unresolved event exists', async () => {
       prisma.workflow.findUnique.mockResolvedValue(mockWorkflowWithTrigger);
       triggerEvalService.evaluate.mockReturnValue({ triggered: true, details: 'triggered' });
       triggerEvalService.renderMessage.mockReturnValue('Alert message');
       eventsService.trigger.mockRejectedValue(
         new TRPCError({
           code: 'CONFLICT',
-          message: 'An open event already exists for this workflow',
+          message: 'An unresolved event already exists for this workflow',
         }),
       );
 
-      const result = await service.simulate('wf-1', 95, 'user-1', false);
+      await expect(service.simulate('wf-1', 95, 'user-1', false)).rejects.toMatchObject({
+        code: 'CONFLICT',
+      });
+    });
 
-      expect(result.triggered).toBe(true);
-      expect(result.alreadyOpen).toBe(true);
+    it('should use custom eventTitle when provided', async () => {
+      prisma.workflow.findUnique.mockResolvedValue(mockWorkflowWithTrigger);
+      triggerEvalService.evaluate.mockReturnValue({ triggered: true, details: 'triggered' });
+      triggerEvalService.renderMessage.mockReturnValue('Alert message');
+      eventsService.trigger.mockResolvedValue({
+        id: 'ev-1',
+        title: 'My custom title',
+        payload: {},
+        status: 'OPEN',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        workflowId: 'wf-1',
+        resolvedAt: null,
+        resolvedById: null,
+      });
+
+      await service.simulate('wf-1', 95, 'user-1', false, 'My custom title');
+
+      expect(eventsService.trigger).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'My custom title',
+        }),
+        'user-1',
+      );
     });
   });
 });

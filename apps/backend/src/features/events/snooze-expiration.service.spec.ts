@@ -1,11 +1,19 @@
 import { Test, type TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
+import { SchedulerRegistry } from '@nestjs/schedule';
 import { mockDeep, type DeepMockProxy } from 'jest-mock-extended';
 import { type PrismaClient } from '@prisma/client';
 import { SnoozeExpirationService } from './snooze-expiration.service';
 import { PrismaService } from '../../database/prisma.service';
-import { NotificationsService } from '../notifications/notifications.service';
+import { EventsService } from './events.service';
 
 const pastDate = new Date(Date.now() - 3600000); // 1 hour ago
+
+const mockWorkflow = {
+  name: 'Test Workflow',
+  userId: 'user-owner',
+  recipients: [{ channel: 'IN_APP', destination: 'user-2' }],
+};
 
 const mockSnoozedEvent = {
   id: 'evt-1',
@@ -25,6 +33,7 @@ const mockSnoozedEvent = {
     eventId: 'evt-1',
     userId: 'user-1',
   },
+  workflow: mockWorkflow,
 };
 
 const mockSnoozedEvent2 = {
@@ -45,6 +54,7 @@ const mockSnoozedEvent2 = {
     eventId: 'evt-2',
     userId: 'user-2',
   },
+  workflow: mockWorkflow,
 };
 
 function createTxMock() {
@@ -80,16 +90,23 @@ function setupTxMockDefaults(txMock: DeepMockProxy<PrismaClient>) {
 describe('SnoozeExpirationService', () => {
   let service: SnoozeExpirationService;
   let prisma: DeepMockProxy<PrismaClient>;
-  let notificationsService: { notify: jest.Mock };
+  let eventsService: { sendStatusNotifications: jest.Mock };
 
   beforeEach(async () => {
-    notificationsService = { notify: jest.fn().mockResolvedValue(undefined) };
+    eventsService = {
+      sendStatusNotifications: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SnoozeExpirationService,
         { provide: PrismaService, useValue: mockDeep<PrismaClient>() },
-        { provide: NotificationsService, useValue: notificationsService },
+        { provide: EventsService, useValue: eventsService },
+        { provide: ConfigService, useValue: { get: () => '*/5 * * * *' } },
+        {
+          provide: SchedulerRegistry,
+          useValue: { addCronJob: jest.fn() },
+        },
       ],
     }).compile();
 
@@ -142,7 +159,7 @@ describe('SnoozeExpirationService', () => {
       });
     });
 
-    it('should call NotificationsService.notify for each reopened event', async () => {
+    it('should call sendStatusNotifications for each reopened event', async () => {
       const txMock = createTxMock();
       txMock.event.update.mockResolvedValue({ status: 'OPEN' } as never);
       txMock.eventHistory.create.mockResolvedValue({
@@ -158,16 +175,20 @@ describe('SnoozeExpirationService', () => {
 
       await service.handleExpiredSnoozes();
 
-      expect(notificationsService.notify).toHaveBeenCalledTimes(2);
-      expect(notificationsService.notify).toHaveBeenCalledWith(
-        'system',
-        'event.reopened',
-        expect.objectContaining({ eventId: 'evt-1' }),
+      expect(eventsService.sendStatusNotifications).toHaveBeenCalledTimes(2);
+      expect(eventsService.sendStatusNotifications).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: expect.objectContaining({ id: 'evt-1' }),
+          type: 'EVENT_REOPENED',
+          sseEvent: 'event.reopened',
+        }),
       );
-      expect(notificationsService.notify).toHaveBeenCalledWith(
-        'system',
-        'event.reopened',
-        expect.objectContaining({ eventId: 'evt-2' }),
+      expect(eventsService.sendStatusNotifications).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: expect.objectContaining({ id: 'evt-2' }),
+          type: 'EVENT_REOPENED',
+          sseEvent: 'event.reopened',
+        }),
       );
     });
 
@@ -177,7 +198,7 @@ describe('SnoozeExpirationService', () => {
       await service.handleExpiredSnoozes();
 
       expect(prisma.$transaction).not.toHaveBeenCalled();
-      expect(notificationsService.notify).not.toHaveBeenCalled();
+      expect(eventsService.sendStatusNotifications).not.toHaveBeenCalled();
     });
 
     it('should not touch snoozes with future until date', async () => {

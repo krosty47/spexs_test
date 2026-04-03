@@ -4,7 +4,11 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { MailerService } from '../mailer/services/mailer.service';
-import { eventTriggeredTemplate } from '../mailer/templates';
+import {
+  eventTriggeredTemplate,
+  eventResolvedTemplate,
+  eventSnoozedTemplate,
+} from '../mailer/templates';
 import {
   parseRecipients,
   type TriggerEventInput,
@@ -40,7 +44,7 @@ export class EventsService {
         where,
         skip,
         take: pagination.limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { updatedAt: 'desc' },
         include: {
           workflow: { select: { id: true, name: true } },
           _count: { select: { comments: true } },
@@ -117,18 +121,18 @@ export class EventsService {
 
     // Wrap event creation + history in a transaction
     const event = await this.prisma.$transaction(async (tx) => {
-      // Deduplication check: no duplicate OPEN events for the same workflow
-      const existingOpen = await tx.event.findFirst({
+      // Deduplication check: no duplicate OPEN/SNOOZED events for the same workflow
+      const existingUnresolved = await tx.event.findFirst({
         where: {
           workflowId: input.workflowId,
-          status: 'OPEN',
+          status: { in: ['OPEN', 'SNOOZED'] },
         },
       });
 
-      if (existingOpen) {
+      if (existingUnresolved) {
         throw new TRPCError({
           code: 'CONFLICT',
-          message: 'An open event already exists for this workflow',
+          message: 'An unresolved event already exists for this workflow',
         });
       }
 
@@ -213,7 +217,7 @@ export class EventsService {
   }
 
   async resolve(id: string, userId: string) {
-    return this.prisma.$transaction(async (tx) => {
+    const resolved = await this.prisma.$transaction(async (tx) => {
       const event = await tx.event.findUnique({ where: { id } });
 
       if (!event) {
@@ -223,7 +227,7 @@ export class EventsService {
         });
       }
 
-      const resolved = await tx.event.update({
+      const updated = await tx.event.update({
         where: { id },
         data: {
           status: 'RESOLVED',
@@ -240,12 +244,42 @@ export class EventsService {
         },
       });
 
-      return resolved;
+      return updated;
     });
+
+    // Send notifications (fire-and-forget)
+    const [workflow, user] = await Promise.all([
+      this.getWorkflowForNotifications(resolved.workflowId),
+      this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { name: true },
+      }),
+    ]);
+
+    if (workflow) {
+      this.sendStatusNotifications({
+        event: resolved,
+        workflow,
+        userId,
+        type: 'EVENT_RESOLVED',
+        sseEvent: 'event.resolved',
+        title: `Event resolved: ${resolved.title}`,
+        body: `Event from workflow "${workflow.name}" has been resolved.`,
+        emailSubject: `Resolved: ${resolved.title}`,
+        emailHtml: eventResolvedTemplate({
+          eventTitle: resolved.title,
+          workflowName: workflow.name,
+          resolvedAt: resolved.resolvedAt ?? new Date(),
+          resolvedBy: user?.name,
+        }),
+      });
+    }
+
+    return resolved;
   }
 
   async snooze(id: string, input: SnoozeEventInput, userId: string) {
-    return this.prisma.$transaction(async (tx) => {
+    const snoozed = await this.prisma.$transaction(async (tx) => {
       const event = await tx.event.findUnique({ where: { id } });
 
       if (!event) {
@@ -255,7 +289,7 @@ export class EventsService {
         });
       }
 
-      const snoozed = await tx.event.update({
+      const updated = await tx.event.update({
         where: { id },
         data: { status: 'SNOOZED' },
       });
@@ -277,8 +311,114 @@ export class EventsService {
         },
       });
 
-      return snoozed;
+      return updated;
     });
+
+    // Send notifications (fire-and-forget)
+    const workflow = await this.getWorkflowForNotifications(snoozed.workflowId);
+    if (workflow) {
+      this.sendStatusNotifications({
+        event: snoozed,
+        workflow,
+        userId,
+        type: 'EVENT_SNOOZED',
+        sseEvent: 'event.snoozed',
+        title: `Event snoozed: ${snoozed.title}`,
+        body: `Event from workflow "${workflow.name}" has been snoozed until ${input.until.toLocaleString()}.`,
+        emailSubject: `Snoozed: ${snoozed.title}`,
+        emailHtml: eventSnoozedTemplate({
+          eventTitle: snoozed.title,
+          workflowName: workflow.name,
+          snoozedUntil: input.until,
+          reason: input.reason ?? undefined,
+        }),
+      });
+    }
+
+    return snoozed;
+  }
+
+  private async getWorkflowForNotifications(workflowId: string) {
+    return this.prisma.workflow.findUnique({
+      where: { id: workflowId },
+      select: {
+        id: true,
+        name: true,
+        recipients: true,
+        userId: true,
+        user: { select: { email: true } },
+      },
+    });
+  }
+
+  sendStatusNotifications(params: {
+    event: { id: string; title: string; workflowId: string };
+    workflow: {
+      id: string;
+      name: string;
+      recipients: unknown;
+      userId: string;
+      user?: { email: string } | null;
+    };
+    userId: string;
+    type: 'EVENT_RESOLVED' | 'EVENT_SNOOZED' | 'EVENT_REOPENED';
+    sseEvent: string;
+    title: string;
+    body: string;
+    emailSubject: string;
+    emailHtml: string;
+  }) {
+    const { event, workflow, userId, type, sseEvent, title, body, emailSubject, emailHtml } =
+      params;
+    const recipients = parseRecipients(workflow.recipients);
+
+    // SSE notification
+    this.notificationsService.notify(userId, sseEvent, {
+      eventId: event.id,
+      title: event.title,
+      workflowId: event.workflowId,
+    });
+
+    // In-app notifications to owner + IN_APP recipients
+    const inAppRecipientIds = recipients
+      .filter((r) => r.channel === 'IN_APP')
+      .map((r) => r.destination);
+    const notifyUserIds = new Set([workflow.userId, ...inAppRecipientIds]);
+
+    Promise.all(
+      [...notifyUserIds].map((uid) =>
+        this.notificationsService.send({
+          userId: uid,
+          type,
+          title,
+          body,
+          metadata: { eventId: event.id, workflowId: event.workflowId },
+        }),
+      ),
+    ).catch((err) => {
+      this.logger.error(`Error sending in-app notifications for ${sseEvent}`, err);
+    });
+
+    // Emails to EMAIL recipients + workflow owner (fire-and-forget)
+    const emailDestinations = new Set(
+      recipients.filter((r) => r.channel === 'EMAIL').map((r) => r.destination),
+    );
+    if (workflow.user?.email) {
+      emailDestinations.add(workflow.user.email);
+    }
+
+    if (emailDestinations.size > 0) {
+      Promise.allSettled(
+        [...emailDestinations].map((to) =>
+          this.mailerService.send({ to, subject: emailSubject, html: emailHtml }),
+        ),
+      ).then((results) => {
+        const failed = results.filter((r) => r.status === 'rejected');
+        if (failed.length > 0) {
+          this.logger.error(`${failed.length} email(s) failed for ${sseEvent}`);
+        }
+      });
+    }
   }
 
   async addComment(eventId: string, content: string, userId: string) {

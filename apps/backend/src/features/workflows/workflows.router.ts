@@ -64,6 +64,12 @@ export class WorkflowsRouter {
     @Ctx() ctx: AppContextType,
   ) {
     if (!ctx.user) throw new TRPCError({ code: 'UNAUTHORIZED' });
-    return this.workflowsService.simulate(input.id, input.metricValue, ctx.user.id, input.dryRun);
+    return this.workflowsService.simulate(
+      input.id,
+      input.metricValue,
+      ctx.user.id,
+      input.dryRun,
+      input.eventTitle,
+    );
   }
 }

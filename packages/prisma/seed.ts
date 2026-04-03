@@ -33,6 +33,8 @@ const SEED_IDS = {
   notif3: 'ca378548d8a17f952a98b36f9',
   notif4: 'c0df684a7ea35896a62f63ef0',
   notif5: 'c00a42c6da1d91443c8f8e02b',
+  workflow: (i: number) =>
+    `c${createHash('sha256').update(`workflow-${i}`).digest('hex').slice(0, 24)}`,
   event: (i: number) => `c${createHash('sha256').update(`event-${i}`).digest('hex').slice(0, 24)}`,
 } as const;
 
@@ -156,9 +158,7 @@ async function main() {
     triggerConfig: { type: 'THRESHOLD', metric: 'wa_csat_score', operator: '<', value: 3.5 },
     outputMessage:
       'Customer satisfaction dropped to {{value}}/5. Users are not happy with the chatbot experience — review recent conversations to find what went wrong.',
-    recipients: [
-      { channel: 'IN_APP', destination: regularUser.id },
-    ],
+    recipients: [{ channel: 'IN_APP', destination: regularUser.id }],
   };
   const workflow4 = await prisma.workflow.upsert({
     where: { id: SEED_IDS.workflow4 },
@@ -219,7 +219,177 @@ async function main() {
   });
 
   // ---------------------------------------------------------------------------
+  // Additional workflows for pagination events (workflows 7-16)
+  // Each gets at most one non-RESOLVED event to respect the dedup rule.
+  // ---------------------------------------------------------------------------
+
+  const extraWorkflowDefs = [
+    {
+      name: 'High Template Rejection Rate',
+      description: 'Alerts when WhatsApp message templates are being rejected at a high rate.',
+      triggerType: TriggerType.THRESHOLD,
+      triggerConfig: {
+        type: 'THRESHOLD',
+        metric: 'wa_template_reject_pct',
+        operator: '>',
+        value: 10,
+      },
+      outputMessage:
+        '{{value}}% of your message templates are being rejected by Meta — review your templates for policy compliance.',
+      isActive: true,
+      userId: adminUser.id,
+    },
+    {
+      name: 'Bot Handoff Failures',
+      description: 'Detects when the bot fails to hand off conversations to live agents.',
+      triggerType: TriggerType.THRESHOLD,
+      triggerConfig: {
+        type: 'THRESHOLD',
+        metric: 'wa_handoff_failure_count',
+        operator: '>=',
+        value: 5,
+      },
+      outputMessage:
+        '{{value}} handoff attempts failed — users are stuck without a live agent. Check the escalation flow.',
+      isActive: true,
+      userId: adminUser.id,
+    },
+    {
+      name: 'Webhook Delivery Latency',
+      description: 'Monitors webhook callback latency from WhatsApp Cloud API.',
+      triggerType: TriggerType.THRESHOLD,
+      triggerConfig: {
+        type: 'THRESHOLD',
+        metric: 'wa_webhook_latency_ms',
+        operator: '>',
+        value: 3000,
+      },
+      outputMessage:
+        'Webhook callbacks are taking {{value}}ms — your server may be under load or the network is congested.',
+      isActive: true,
+      userId: regularUser.id,
+    },
+    {
+      name: 'Session Expiry Spike',
+      description:
+        'Alerts when an unusual number of WhatsApp 24h sessions expire before resolution.',
+      triggerType: TriggerType.VARIANCE,
+      triggerConfig: { type: 'VARIANCE', baseValue: 8, deviationPercentage: 50 },
+      outputMessage:
+        'Session expiry rate jumped to {{value}}% — users are not getting responses within the 24h window.',
+      isActive: true,
+      userId: adminUser.id,
+    },
+    {
+      name: 'Media Upload Failures',
+      description: 'Detects failures in uploading images and documents via WhatsApp.',
+      triggerType: TriggerType.THRESHOLD,
+      triggerConfig: {
+        type: 'THRESHOLD',
+        metric: 'wa_media_upload_errors',
+        operator: '>=',
+        value: 10,
+      },
+      outputMessage: '{{value}} media uploads failed — check file sizes and supported formats.',
+      isActive: true,
+      userId: adminUser.id,
+    },
+    {
+      name: 'Conversation Volume Surge',
+      description: 'Flags unusual spikes in incoming conversation volume.',
+      triggerType: TriggerType.VARIANCE,
+      triggerConfig: { type: 'VARIANCE', baseValue: 200, deviationPercentage: 60 },
+      outputMessage:
+        'Incoming conversations surged to {{value}} — your bot may need scaling or a queue.',
+      isActive: true,
+      userId: regularUser.id,
+    },
+    {
+      name: 'Opt-Out Rate Climbing',
+      description:
+        'Alerts when users are opting out of WhatsApp notifications at an elevated rate.',
+      triggerType: TriggerType.THRESHOLD,
+      triggerConfig: { type: 'THRESHOLD', metric: 'wa_optout_pct', operator: '>', value: 3 },
+      outputMessage:
+        '{{value}}% of users opted out — review message frequency and content relevance.',
+      isActive: true,
+      userId: adminUser.id,
+    },
+    {
+      name: 'Read Receipt Drop',
+      description: 'Monitors the percentage of messages that are read by recipients.',
+      triggerType: TriggerType.THRESHOLD,
+      triggerConfig: { type: 'THRESHOLD', metric: 'wa_read_receipt_pct', operator: '<', value: 30 },
+      outputMessage:
+        'Only {{value}}% of messages are being read — check if you are sending at the right time or the content is relevant.',
+      isActive: true,
+      userId: adminUser.id,
+    },
+    {
+      name: 'Interactive Button Timeout',
+      description:
+        'Detects when interactive message buttons are not being pressed within expected time.',
+      triggerType: TriggerType.THRESHOLD,
+      triggerConfig: {
+        type: 'THRESHOLD',
+        metric: 'wa_button_timeout_pct',
+        operator: '>',
+        value: 25,
+      },
+      outputMessage:
+        '{{value}}% of interactive buttons timed out — users may not understand the options presented.',
+      isActive: true,
+      userId: regularUser.id,
+    },
+    {
+      name: 'Daily Spend Limit Approach',
+      description:
+        'Warns when WhatsApp Business API daily spend is approaching the configured limit.',
+      triggerType: TriggerType.THRESHOLD,
+      triggerConfig: {
+        type: 'THRESHOLD',
+        metric: 'wa_daily_spend_usd',
+        operator: '>=',
+        value: 450,
+      },
+      outputMessage:
+        'Daily spend reached ${{value}} — you are approaching the $500 limit. Conversations may be throttled soon.',
+      isActive: false,
+      userId: adminUser.id,
+    },
+  ];
+
+  const extraWorkflows = [];
+  for (let i = 0; i < extraWorkflowDefs.length; i++) {
+    const def = extraWorkflowDefs[i];
+    const wfId = SEED_IDS.workflow(i + 7);
+    const wf = await prisma.workflow.upsert({
+      where: { id: wfId },
+      update: {
+        triggerType: def.triggerType,
+        triggerConfig: def.triggerConfig,
+        outputMessage: def.outputMessage,
+        recipients: [],
+      },
+      create: {
+        id: wfId,
+        name: def.name,
+        description: def.description,
+        isActive: def.isActive,
+        triggerType: def.triggerType,
+        triggerConfig: def.triggerConfig,
+        outputMessage: def.outputMessage,
+        recipients: [],
+        userId: def.userId,
+      },
+    });
+    extraWorkflows.push(wf);
+  }
+
+  // ---------------------------------------------------------------------------
   // Events — WhatsApp Chatbot Incidents
+  //
+  // RULE: At most ONE non-RESOLVED (OPEN or SNOOZED) event per workflow.
   // ---------------------------------------------------------------------------
 
   const event1 = await prisma.event.upsert({
@@ -309,7 +479,31 @@ async function main() {
     },
   });
 
-  // Seed additional events for pagination testing (events 6-30)
+  // ---------------------------------------------------------------------------
+  // Pagination events (events 6-30)
+  //
+  // We spread events across ALL 16 workflows (6 core + 10 extra).
+  // Each workflow gets at most ONE non-RESOLVED event across the entire seed.
+  //
+  // Core workflows 1-5 already have a non-RESOLVED event above, so pagination
+  // events for those are always RESOLVED. Workflow 6 is inactive so we allow
+  // one OPEN event for it. Extra workflows (7-16) each get at most one
+  // OPEN or SNOOZED event.
+  // ---------------------------------------------------------------------------
+
+  const allWorkflows = [
+    workflow1,
+    workflow2,
+    workflow3,
+    workflow4,
+    workflow5,
+    workflow6,
+    ...extraWorkflows,
+  ];
+
+  // Track which workflows already have a non-resolved event from the named events above
+  const hasUnresolved = new Set([workflow1.id, workflow3.id, workflow4.id, workflow5.id]);
+
   const scenarios = [
     { title: 'Bot slow when searching products', flow: 'product_search' },
     { title: 'Promo messages not being delivered', flow: 'promo_broadcast' },
@@ -322,13 +516,50 @@ async function main() {
     { title: 'Users abandoning account linking', flow: 'account_link' },
     { title: 'Errors when uploading images/files', flow: 'media_upload' },
   ];
-  const statuses = [EventStatus.OPEN, EventStatus.RESOLVED, EventStatus.SNOOZED];
-  const workflows = [workflow1, workflow2, workflow3, workflow4, workflow5, workflow6];
+
+  // Desired statuses per event — we'll override to RESOLVED when necessary
+  const desiredStatuses = [
+    EventStatus.OPEN,
+    EventStatus.RESOLVED,
+    EventStatus.SNOOZED,
+    EventStatus.RESOLVED,
+    EventStatus.OPEN,
+    EventStatus.RESOLVED,
+    EventStatus.SNOOZED,
+    EventStatus.RESOLVED,
+    EventStatus.OPEN,
+    EventStatus.RESOLVED,
+    EventStatus.RESOLVED,
+    EventStatus.OPEN,
+    EventStatus.RESOLVED,
+    EventStatus.SNOOZED,
+    EventStatus.RESOLVED,
+    EventStatus.OPEN,
+    EventStatus.RESOLVED,
+    EventStatus.RESOLVED,
+    EventStatus.RESOLVED,
+    EventStatus.OPEN,
+    EventStatus.RESOLVED,
+    EventStatus.SNOOZED,
+    EventStatus.RESOLVED,
+    EventStatus.RESOLVED,
+    EventStatus.RESOLVED,
+  ];
 
   for (let i = 6; i <= 30; i++) {
     const scenario = scenarios[(i - 6) % scenarios.length];
-    const status = statuses[i % 3];
-    const workflow = workflows[i % 6];
+    const workflow = allWorkflows[i % allWorkflows.length];
+
+    // Determine status: if this workflow already has an unresolved event, force RESOLVED
+    let status = desiredStatuses[i - 6] ?? EventStatus.RESOLVED;
+    if (status !== EventStatus.RESOLVED && hasUnresolved.has(workflow.id)) {
+      status = EventStatus.RESOLVED;
+    }
+
+    // Mark this workflow as having an unresolved event
+    if (status !== EventStatus.RESOLVED) {
+      hasUnresolved.add(workflow.id);
+    }
 
     const eventId = SEED_IDS.event(i);
     await prisma.event.upsert({

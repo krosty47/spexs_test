@@ -113,10 +113,17 @@ export default function WorkflowDetailPage() {
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
 
+  const utils = trpc.useUtils();
   const workflowQuery = trpc.workflows.findOne.useQuery({ id: params.id });
-  const toggleMutation = trpc.workflows.toggleActive.useMutation();
+  const toggleMutation = trpc.workflows.toggleActive.useMutation({
+    onSuccess: () => {
+      utils.workflows.findOne.invalidate({ id: params.id });
+      utils.workflows.findAll.invalidate();
+    },
+  });
   const deleteMutation = trpc.workflows.delete.useMutation({
     onSuccess: () => {
+      utils.workflows.findAll.invalidate();
       router.push('/workflows');
     },
   });
@@ -250,7 +257,11 @@ export default function WorkflowDetailPage() {
 
           {/* Simulate Trigger */}
           {hasTriggerConfig && (
-            <SimulateTrigger workflowId={workflow.id} isActive={workflow.isActive} />
+            <SimulateTrigger
+              workflowId={workflow.id}
+              isActive={workflow.isActive}
+              hasUnresolvedEvent={workflow.hasUnresolvedEvent}
+            />
           )}
 
           {/* Recipients */}

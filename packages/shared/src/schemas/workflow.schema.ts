@@ -81,6 +81,7 @@ export const simulateWorkflowSchema = z.object({
   id: z.string().cuid(),
   metricValue: z.number(),
   dryRun: z.boolean().default(false),
+  eventTitle: z.string().min(3).max(200).optional(),
 });
 
 export type SimulateWorkflowInput = z.infer<typeof simulateWorkflowSchema>;
@@ -90,7 +91,6 @@ export interface SimulateWorkflowResult {
   message: string;
   details: string;
   dryRun: boolean;
-  alreadyOpen?: boolean;
 }
 
 // --- Output Schemas (tRPC procedure return shapes) ---
@@ -146,6 +146,7 @@ export type WorkflowListOutput = z.infer<typeof workflowListOutputSchema>;
 export const workflowDetailOutputSchema = workflowOutputSchema.extend({
   _count: z.object({ events: z.number() }),
   events: z.array(embeddedEventSchema),
+  hasUnresolvedEvent: z.boolean(),
 });
 
 export type WorkflowDetailOutput = z.infer<typeof workflowDetailOutputSchema>;
@@ -156,7 +157,6 @@ export const simulateWorkflowOutputSchema = z.object({
   message: z.string(),
   details: z.string(),
   dryRun: z.boolean(),
-  alreadyOpen: z.boolean().optional(),
 });
 
 export type SimulateWorkflowOutput = z.infer<typeof simulateWorkflowOutputSchema>;
