@@ -46,9 +46,13 @@ docker compose up -d
 
 This starts:
 
-| Service    | Port |
-| ---------- | ---- |
-| PostgreSQL | 5433 |
+| Service    | Port | Description                                  |
+| ---------- | ---- | -------------------------------------------- |
+| PostgreSQL | 5433 | Database                                     |
+| Mailpit    | 8025 | Email testing UI — http://localhost:8025      |
+| Mailpit    | 1025 | SMTP server (used by the backend)            |
+
+> **Email testing:** Mailpit intercepts all outbound emails regardless of recipient address. No external email provider is needed for local development. Open http://localhost:8025 to view captured emails.
 
 ### 4. Set up the database
 
@@ -92,7 +96,7 @@ Use one of the seeded accounts:
 ├── packages/
 │   ├── prisma/           # Prisma schema, migrations, seed
 │   └── shared/           # Shared Zod schemas and types
-├── docker-compose.yml    # PostgreSQL
+├── docker-compose.yml    # PostgreSQL + Mailpit
 ├── turbo.json            # Turborepo pipeline config
 └── pnpm-workspace.yaml   # Workspace definition
 ```

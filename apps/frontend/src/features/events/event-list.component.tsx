@@ -8,6 +8,7 @@ import { StatusBadge } from '@/components/status-badge.component';
 import { TableCell, TableRow } from '@/components/ui/table';
 import { Card, CardContent } from '@/components/ui/card';
 import Link from 'next/link';
+import { CONTENT_PADDING_X } from '@/lib/utils';
 
 const statusFilters = [
   { label: 'All', value: undefined },
@@ -48,7 +49,7 @@ export function EventList() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex flex-wrap gap-2 pb-4">
+      <div className={`flex flex-wrap gap-2 pb-4 ${CONTENT_PADDING_X}`}>
         {statusFilters.map((filter) => (
           <Button
             key={filter.label}
@@ -65,7 +66,7 @@ export function EventList() {
       </div>
 
       {events.length === 0 ? (
-        <p className="text-[var(--muted-foreground)]">No events found</p>
+        <p className={`text-[var(--muted-foreground)] ${CONTENT_PADDING_X}`}>No events found</p>
       ) : (
         <PaginatedTable
           columns={['Title', 'Workflow', 'Status', 'Created', 'Comments']}

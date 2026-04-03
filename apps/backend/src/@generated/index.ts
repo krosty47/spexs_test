@@ -46,6 +46,7 @@ const authRouter = t.router({
     .output(authOutputSchema)
     .mutation(() => null as any),
   me: t.procedure.output(trpcUserSchema.nullable()).query(() => null as any),
+  logout: t.procedure.output(z.object({ success: z.boolean() })).mutation(() => null as any),
 });
 
 const workflowsRouter = t.router({

@@ -65,7 +65,7 @@ export default function WorkflowDetailPage() {
   const validTriggerConfig = parsedTriggerConfig.success ? parsedTriggerConfig.data : undefined;
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-4 sm:p-6">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3">
           <Button

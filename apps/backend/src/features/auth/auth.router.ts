@@ -55,17 +55,29 @@ export class AuthRouter {
     return ctx.user;
   }
 
+  @Mutation({ output: z.object({ success: z.boolean() }) })
+  @UseMiddlewares(AuthMiddleware)
+  async logout(@Ctx() ctx: AppContextType) {
+    this.setCookie(ctx, 'access_token', '', 0);
+    this.setCookie(ctx, 'refresh_token', '', 0);
+    return { success: true };
+  }
+
   private setAuthCookies(ctx: AppContextType, accessToken: string, refreshToken: string): void {
+    this.setCookie(ctx, 'access_token', accessToken, 60 * 60);
+    this.setCookie(ctx, 'refresh_token', refreshToken, 7 * 24 * 60 * 60);
+  }
+
+  private setCookie(ctx: AppContextType, name: string, value: string, maxAge: number): void {
     const res = ctx.res as {
       setCookie: (name: string, value: string, opts: Record<string, unknown>) => void;
     };
-    const cookieOpts = {
+    res.setCookie(name, value, {
       httpOnly: true,
-      secure: false,
+      secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
-    };
-    res.setCookie('access_token', accessToken, { ...cookieOpts, maxAge: 60 * 60 });
-    res.setCookie('refresh_token', refreshToken, { ...cookieOpts, maxAge: 7 * 24 * 60 * 60 });
+      maxAge,
+    });
   }
 }

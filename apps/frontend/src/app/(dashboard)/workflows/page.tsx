@@ -6,7 +6,7 @@ import Link from 'next/link';
 
 export default function WorkflowsPage() {
   return (
-    <div className="space-y-6">
+    <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-4 sm:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-bold">Workflows</h2>

@@ -46,11 +46,12 @@ async function main() {
   // Workflows — WhatsApp Chatbot Monitoring for SPEXS.ai
   // ---------------------------------------------------------------------------
 
-  // 1. Chatbot Response Time (THRESHOLD)
+  // 1. Slow Bot Replies (THRESHOLD)
   const workflow1Data = {
     triggerType: TriggerType.THRESHOLD,
     triggerConfig: { type: 'THRESHOLD', metric: 'wa_response_time_ms', operator: '>', value: 5000 },
-    outputMessage: 'Alert: WhatsApp chatbot {{metric}} is {{value}}ms — exceeds 5s SLA',
+    outputMessage:
+      'Your chatbot is taking too long to reply ({{value}}ms). Users expect answers in under 5 seconds — check if your bot or the WhatsApp API is running slow.',
     recipients: [
       { channel: 'IN_APP', destination: 'admin@spexs.dev' },
       { channel: 'EMAIL', destination: 'admin@spexs.dev' },
@@ -61,15 +62,16 @@ async function main() {
     update: workflow1Data,
     create: {
       id: 'seed-workflow-1',
-      name: 'WA Chatbot Response Time',
-      description: 'Triggers when WhatsApp chatbot response time exceeds 5 seconds',
+      name: 'Slow Bot Replies',
+      description:
+        'Get alerted when your chatbot takes more than 5 seconds to respond — slow replies cause users to leave the conversation.',
       isActive: true,
       ...workflow1Data,
       userId: adminUser.id,
     },
   });
 
-  // 2. Message Delivery Failure Rate (THRESHOLD)
+  // 2. Messages Not Delivered (THRESHOLD)
   const workflow2Data = {
     triggerType: TriggerType.THRESHOLD,
     triggerConfig: {
@@ -78,7 +80,8 @@ async function main() {
       operator: '>',
       value: 5,
     },
-    outputMessage: 'Alert: WhatsApp delivery failure rate at {{value}}% — check Meta API status',
+    outputMessage:
+      '{{value}}% of your messages are failing to deliver. This usually means a problem with the WhatsApp API or your message templates.',
     recipients: [
       { channel: 'IN_APP', destination: 'admin@spexs.dev' },
       { channel: 'EMAIL', destination: 'admin@spexs.dev' },
@@ -89,20 +92,21 @@ async function main() {
     update: workflow2Data,
     create: {
       id: 'seed-workflow-2',
-      name: 'WA Delivery Failure Rate',
-      description: 'Triggers when WhatsApp message delivery failure rate exceeds 5%',
+      name: 'Messages Not Delivered',
+      description:
+        'Get alerted when more than 5% of outgoing messages fail to reach users — could indicate a template issue or WhatsApp API outage.',
       isActive: true,
       ...workflow2Data,
       userId: adminUser.id,
     },
   });
 
-  // 3. Conversation Abandonment Rate (VARIANCE)
+  // 3. Users Dropping Off Conversations (VARIANCE)
   const workflow3Data = {
     triggerType: TriggerType.VARIANCE,
     triggerConfig: { type: 'VARIANCE', baseValue: 15, deviationPercentage: 40 },
     outputMessage:
-      'Warning: Conversation abandonment rate deviated to {{value}}% — review chatbot flows',
+      'More users than usual are leaving conversations without finishing ({{value}}%). Review your chatbot flows — something might be confusing or broken.',
     recipients: [{ channel: 'IN_APP', destination: 'admin@spexs.dev' }],
   };
   const workflow3 = await prisma.workflow.upsert({
@@ -110,20 +114,21 @@ async function main() {
     update: workflow3Data,
     create: {
       id: 'seed-workflow-3',
-      name: 'WA Conversation Abandonment',
+      name: 'Users Dropping Off Conversations',
       description:
-        'Triggers when conversation abandonment deviates more than 40% from the 15% baseline',
+        'Get alerted when the conversation drop-off rate changes significantly from the usual 15% baseline — a spike usually means a broken or confusing bot flow.',
       isActive: true,
       ...workflow3Data,
       userId: adminUser.id,
     },
   });
 
-  // 4. User Satisfaction Score (THRESHOLD)
+  // 4. Low Customer Satisfaction (THRESHOLD)
   const workflow4Data = {
     triggerType: TriggerType.THRESHOLD,
     triggerConfig: { type: 'THRESHOLD', metric: 'wa_csat_score', operator: '<', value: 3.5 },
-    outputMessage: 'Alert: WhatsApp chatbot CSAT dropped to {{value}} — below 3.5 threshold',
+    outputMessage:
+      'Customer satisfaction dropped to {{value}}/5. Users are not happy with the chatbot experience — review recent conversations to find what went wrong.',
     recipients: [
       { channel: 'IN_APP', destination: 'admin@spexs.dev' },
       { channel: 'IN_APP', destination: 'support@spexs.dev' },
@@ -134,19 +139,21 @@ async function main() {
     update: workflow4Data,
     create: {
       id: 'seed-workflow-4',
-      name: 'WA Chatbot CSAT Score',
-      description: 'Triggers when WhatsApp chatbot satisfaction score drops below 3.5/5',
+      name: 'Low Customer Satisfaction',
+      description:
+        'Get alerted when users rate the chatbot below 3.5 out of 5 — helps you catch bad experiences early and improve bot responses.',
       isActive: true,
       ...workflow4Data,
       userId: adminUser.id,
     },
   });
 
-  // 5. WhatsApp API Error Rate (VARIANCE)
+  // 5. Unusual API Error Spike (VARIANCE)
   const workflow5Data = {
     triggerType: TriggerType.VARIANCE,
     triggerConfig: { type: 'VARIANCE', baseValue: 2, deviationPercentage: 100 },
-    outputMessage: 'Critical: WA API error rate spiked to {{value}}% — investigate Meta Cloud API',
+    outputMessage:
+      'WhatsApp API errors jumped to {{value}}% — that is much higher than the usual 2%. This might be a rate limit or an outage on Meta side.',
     recipients: [
       { channel: 'IN_APP', destination: 'admin@spexs.dev' },
       { channel: 'EMAIL', destination: 'admin@spexs.dev' },
@@ -157,19 +164,21 @@ async function main() {
     update: workflow5Data,
     create: {
       id: 'seed-workflow-5',
-      name: 'WA API Error Rate',
-      description: 'Triggers when WhatsApp Cloud API error rate doubles from the 2% baseline',
+      name: 'Unusual API Error Spike',
+      description:
+        'Get alerted when WhatsApp API errors double from the normal 2% rate — usually means Meta is having issues or you are hitting rate limits.',
       isActive: true,
       ...workflow5Data,
       userId: adminUser.id,
     },
   });
 
-  // 6. Message Queue Depth (THRESHOLD) — inactive, used for testing
+  // 6. Message Queue Backing Up (THRESHOLD) — inactive, used for testing
   const workflow6Data = {
     triggerType: TriggerType.THRESHOLD,
     triggerConfig: { type: 'THRESHOLD', metric: 'wa_queue_depth', operator: '>=', value: 500 },
-    outputMessage: 'Critical: {{value}} messages queued — WhatsApp outbound queue is backing up',
+    outputMessage:
+      '{{value}} messages are waiting to be sent — your outbound queue is backing up. This can cause delays for all users.',
     recipients: [],
   };
   const workflow6 = await prisma.workflow.upsert({
@@ -177,8 +186,9 @@ async function main() {
     update: workflow6Data,
     create: {
       id: 'seed-workflow-6',
-      name: 'WA Message Queue Depth',
-      description: 'Triggers when outbound WhatsApp message queue exceeds 500 pending messages',
+      name: 'Message Queue Backing Up',
+      description:
+        'Get alerted when more than 500 messages are waiting to be sent — means your bot cannot keep up with the volume of conversations.',
       isActive: false,
       ...workflow6Data,
       userId: regularUser.id,
@@ -194,7 +204,7 @@ async function main() {
     update: {},
     create: {
       id: 'seed-event-1',
-      title: 'Slow chatbot response — LATAM region',
+      title: 'Bot replying slow in LATAM region',
       payload: {
         region: 'LATAM',
         responseTimeMs: 7200,
@@ -211,7 +221,7 @@ async function main() {
     update: {},
     create: {
       id: 'seed-event-2',
-      title: 'High delivery failures — template messages',
+      title: 'Order confirmation messages not reaching users',
       payload: {
         failureRate: 8.3,
         templateName: 'order_confirmation',
@@ -230,7 +240,7 @@ async function main() {
     update: {},
     create: {
       id: 'seed-event-3',
-      title: 'Abandonment spike — onboarding flow',
+      title: 'Users leaving during onboarding flow',
       payload: {
         flow: 'onboarding',
         abandonmentRate: 23.5,
@@ -247,7 +257,7 @@ async function main() {
     update: {},
     create: {
       id: 'seed-event-4',
-      title: 'CSAT drop — billing inquiries',
+      title: 'Bad ratings on billing questions',
       payload: {
         category: 'billing',
         csatScore: 2.8,
@@ -264,7 +274,7 @@ async function main() {
     update: {},
     create: {
       id: 'seed-event-5',
-      title: 'WA Cloud API error spike',
+      title: 'WhatsApp API errors spiking — possible rate limit',
       payload: {
         errorRate: 4.7,
         topError: '131026 (Rate limit hit)',
@@ -278,16 +288,16 @@ async function main() {
 
   // Seed additional events for pagination testing (events 6-30)
   const scenarios = [
-    { title: 'Slow response — product catalog query', flow: 'product_search' },
-    { title: 'Delivery failure — promotional broadcast', flow: 'promo_broadcast' },
-    { title: 'Abandonment — payment flow', flow: 'payment' },
-    { title: 'Low CSAT — returns process', flow: 'returns' },
-    { title: 'API timeout — webhook delivery', flow: 'webhooks' },
-    { title: 'Queue backup — bulk campaign', flow: 'bulk_campaign' },
-    { title: 'Slow response — FAQ bot', flow: 'faq' },
-    { title: 'Delivery failure — interactive buttons', flow: 'interactive_msg' },
-    { title: 'Abandonment — account linking', flow: 'account_link' },
-    { title: 'API error — media upload', flow: 'media_upload' },
+    { title: 'Bot slow when searching products', flow: 'product_search' },
+    { title: 'Promo messages not being delivered', flow: 'promo_broadcast' },
+    { title: 'Users leaving during payment', flow: 'payment' },
+    { title: 'Bad ratings on returns process', flow: 'returns' },
+    { title: 'Webhook deliveries timing out', flow: 'webhooks' },
+    { title: 'Messages piling up during campaign', flow: 'bulk_campaign' },
+    { title: 'FAQ bot responding too slowly', flow: 'faq' },
+    { title: 'Interactive button messages failing', flow: 'interactive_msg' },
+    { title: 'Users abandoning account linking', flow: 'account_link' },
+    { title: 'Errors when uploading images/files', flow: 'media_upload' },
   ];
   const statuses = [EventStatus.OPEN, EventStatus.RESOLVED, EventStatus.SNOOZED];
   const workflows = [workflow1, workflow2, workflow3, workflow4, workflow5, workflow6];
@@ -364,7 +374,7 @@ async function main() {
     create: {
       id: 'seed-comment-1',
       content:
-        'Investigating slow response times in LATAM — may be related to Meta API routing issues in the region',
+        'Looking into this — the bot is slow only in LATAM, so it might be a Meta API routing issue in that region.',
       eventId: event1.id,
       userId: adminUser.id,
     },
@@ -376,7 +386,7 @@ async function main() {
     create: {
       id: 'seed-comment-2',
       content:
-        'Resolved — the order_confirmation template was flagged by Meta for review. Re-approved and delivery rate is back to normal.',
+        'Fixed! The order confirmation template got flagged by Meta for review. We re-approved it and deliveries are back to normal.',
       eventId: event2.id,
       userId: adminUser.id,
     },
@@ -393,7 +403,7 @@ async function main() {
       id: 'seed-snooze-1',
       until: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours from now
       reason:
-        'Known issue — billing FAQ responses are being reworked. New intents deploying tomorrow.',
+        'We know about this — the billing FAQ answers are being rewritten. New version goes live tomorrow.',
       eventId: event4.id,
       userId: regularUser.id,
     },
@@ -409,8 +419,8 @@ async function main() {
     create: {
       id: 'seed-notif-1',
       type: NotificationType.EVENT_TRIGGERED,
-      title: 'Slow chatbot response — LATAM region',
-      body: 'Workflow "WA Chatbot Response Time" triggered — response time at 7200ms.',
+      title: 'Bot replying slow in LATAM region',
+      body: 'Your "Slow Bot Replies" workflow triggered — response time hit 7200ms (limit is 5000ms).',
       isRead: false,
       metadata: { eventId: 'seed-event-1', workflowId: 'seed-workflow-1' },
       userId: adminUser.id,
@@ -423,8 +433,8 @@ async function main() {
     create: {
       id: 'seed-notif-2',
       type: NotificationType.EVENT_RESOLVED,
-      title: 'Resolved: High delivery failures — template messages',
-      body: 'Event "High delivery failures — template messages" has been resolved.',
+      title: 'Resolved: Order confirmation messages not reaching users',
+      body: 'The delivery issue has been resolved — the template was re-approved and messages are going through again.',
       isRead: true,
       metadata: { eventId: 'seed-event-2', workflowId: 'seed-workflow-2' },
       userId: adminUser.id,
@@ -437,8 +447,8 @@ async function main() {
     create: {
       id: 'seed-notif-3',
       type: NotificationType.EVENT_SNOOZED,
-      title: 'Snoozed: CSAT drop — billing inquiries',
-      body: 'Event "CSAT drop — billing inquiries" snoozed for 24 hours — new intents deploying tomorrow.',
+      title: 'Snoozed: Bad ratings on billing questions',
+      body: 'Snoozed for 24 hours — the billing FAQ answers are being rewritten and go live tomorrow.',
       isRead: false,
       metadata: { eventId: 'seed-event-4', workflowId: 'seed-workflow-4' },
       userId: regularUser.id,
@@ -451,8 +461,8 @@ async function main() {
     create: {
       id: 'seed-notif-4',
       type: NotificationType.EVENT_TRIGGERED,
-      title: 'Abandonment spike — onboarding flow',
-      body: 'Workflow "WA Conversation Abandonment" triggered — abandonment rate at 23.5%.',
+      title: 'Users leaving during onboarding flow',
+      body: 'Your "Users Dropping Off Conversations" workflow triggered — drop-off rate jumped to 23.5% (baseline is 15%).',
       isRead: false,
       metadata: { eventId: 'seed-event-3', workflowId: 'seed-workflow-3' },
       userId: adminUser.id,
@@ -465,8 +475,8 @@ async function main() {
     create: {
       id: 'seed-notif-5',
       type: NotificationType.EVENT_TRIGGERED,
-      title: 'WA Cloud API error spike',
-      body: 'Workflow "WA API Error Rate" triggered — error rate at 4.7%, top error: rate limit hit.',
+      title: 'WhatsApp API errors spiking — possible rate limit',
+      body: 'Your "Unusual API Error Spike" workflow triggered — error rate jumped to 4.7% (normal is ~2%). Top error: rate limit hit.',
       isRead: false,
       metadata: { eventId: 'seed-event-5', workflowId: 'seed-workflow-5' },
       userId: adminUser.id,

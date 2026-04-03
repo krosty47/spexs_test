@@ -12,11 +12,12 @@ import { trpc } from '@/lib/trpc';
 
 const TRIGGER_OPERATORS = ['>', '<', '>=', '<=', '==', '!='] as const;
 const METRIC_SUGGESTIONS = [
-  'cpu_usage',
-  'memory_usage',
-  'disk_usage',
-  'network_latency',
-  'error_rate',
+  'wa_response_time_ms',
+  'wa_delivery_failure_pct',
+  'wa_abandonment_rate',
+  'wa_csat_score',
+  'wa_api_error_rate',
+  'wa_queue_depth',
 ] as const;
 
 interface WorkflowFormProps {

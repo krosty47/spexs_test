@@ -12,7 +12,7 @@ export function PaginationBar({ page, totalPages, onPageChange }: PaginationBarP
   if (totalPages <= 1) return null;
 
   return (
-    <div className="sticky bottom-0 flex items-center justify-center gap-4 border-t bg-[var(--background)] py-3">
+    <div className="flex items-center justify-center gap-4 py-3">
       <Button
         variant="outline"
         size="sm"

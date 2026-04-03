@@ -8,6 +8,7 @@ import { StatusBadge } from '@/components/status-badge.component';
 import { Card, CardContent } from '@/components/ui/card';
 import { TableCell, TableRow } from '@/components/ui/table';
 import Link from 'next/link';
+import { CONTENT_PADDING_X } from '@/lib/utils';
 
 type EventStatus = 'OPEN' | 'RESOLVED' | 'SNOOZED';
 
@@ -30,7 +31,7 @@ export function HistoryList() {
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<EventStatus | undefined>(undefined);
   const [workflowFilter, setWorkflowFilter] = useState<string | undefined>(undefined);
-  const limit = 20;
+  const limit = 15;
   const utils = trpc.useUtils();
 
   const workflowsQuery = trpc.workflows.findAll.useQuery({ page: 1, limit: 100 });
@@ -54,7 +55,7 @@ export function HistoryList() {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
       {/* Filters */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+      <div className={`flex flex-col gap-3 sm:flex-row sm:items-center ${CONTENT_PADDING_X}`}>
         {/* Status filter */}
         <div className="flex gap-1">
           {STATUS_OPTIONS.map((opt) => (
@@ -91,11 +92,11 @@ export function HistoryList() {
       </div>
 
       {eventsQuery.isLoading && (
-        <p className="text-[var(--muted-foreground)]">Loading history...</p>
+        <p className={`text-[var(--muted-foreground)] ${CONTENT_PADDING_X}`}>Loading history...</p>
       )}
 
       {eventsQuery.error && (
-        <p className="text-[var(--destructive)]">Error: {eventsQuery.error.message}</p>
+        <p className={`text-[var(--destructive)] ${CONTENT_PADDING_X}`}>Error: {eventsQuery.error.message}</p>
       )}
 
       {eventsQuery.data && (
