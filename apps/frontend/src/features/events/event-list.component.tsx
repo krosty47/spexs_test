@@ -106,8 +106,8 @@ export function EventList() {
             </TableRow>
           ))}
           mobileCards={events.map((event) => (
-            <Link key={event.id} href={`/events/${event.id}`}>
-              <Card className="transition-shadow hover:shadow-md">
+            <Link key={event.id} href={`/events/${event.id}`} className="min-w-0">
+              <Card className="overflow-hidden transition-shadow hover:shadow-md">
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">

@@ -40,7 +40,9 @@ export function PaginatedTable({
         </div>
 
         {/* Mobile cards */}
-        <div className={`grid min-w-0 gap-3 md:hidden ${CONTENT_PADDING_X}`}>{mobileCards}</div>
+        <div className={`grid min-w-0 gap-3 overflow-hidden md:hidden ${CONTENT_PADDING_X}`}>
+          {mobileCards}
+        </div>
       </div>
 
       <div className="shrink-0 border-t bg-background">

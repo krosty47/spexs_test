@@ -136,25 +136,23 @@ export function EventDetail({ eventId }: EventDetailProps) {
 
   return (
     <div className="min-h-0 min-w-0 flex-1 space-y-6 overflow-y-auto p-4 sm:p-6">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="mt-1 h-8 w-8 shrink-0"
-            onClick={() => router.push('/events')}
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h2 className="truncate text-xl font-bold sm:text-2xl">{event.title}</h2>
-              <StatusBadge status={event.status} />
-            </div>
+      <div className="flex min-w-0 items-start gap-3">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="mt-1 h-8 w-8 shrink-0"
+          onClick={() => router.push('/events')}
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <h2 className="min-w-0 truncate text-xl font-bold sm:text-2xl">{event.title}</h2>
+            <StatusBadge status={event.status} />
+          </div>
             <p className="mt-1 text-sm text-[var(--muted-foreground)]">
               Workflow: {event.workflow.name}
             </p>
-          </div>
         </div>
       </div>
 
