@@ -37,6 +37,12 @@ export const recipientSchema = z.object({
 });
 export type Recipient = z.infer<typeof recipientSchema>;
 
+/** Safely parse a raw JSON recipients field into a typed array. */
+export function parseRecipients(raw: unknown): Recipient[] {
+  const result = z.array(recipientSchema).safeParse(raw ?? []);
+  return result.success ? result.data : [];
+}
+
 // --- Workflow CRUD Schemas ---
 
 export const createWorkflowSchema = z.object({
@@ -64,7 +70,7 @@ export const updateWorkflowSchema = z.object({
 export type UpdateWorkflowInput = z.infer<typeof updateWorkflowSchema>;
 
 export const workflowIdSchema = z.object({
-  id: z.string().min(1),
+  id: z.string().cuid(),
 });
 
 export type WorkflowIdInput = z.infer<typeof workflowIdSchema>;
@@ -72,7 +78,7 @@ export type WorkflowIdInput = z.infer<typeof workflowIdSchema>;
 // --- Simulation Schema ---
 
 export const simulateWorkflowSchema = z.object({
-  id: z.string().min(1),
+  id: z.string().cuid(),
   metricValue: z.number(),
   dryRun: z.boolean().default(false),
 });

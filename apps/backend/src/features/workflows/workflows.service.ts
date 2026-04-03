@@ -4,12 +4,13 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { TriggerEvaluationService } from './trigger-evaluation.service';
 import { EventsService } from '../events/events.service';
-import { triggerConfigSchema } from '@workflow-manager/shared';
+import { triggerConfigSchema, parseRecipients } from '@workflow-manager/shared';
 import type {
   CreateWorkflowInput,
   UpdateWorkflowInput,
   PaginationInput,
   SimulateWorkflowResult,
+  Recipient,
 } from '@workflow-manager/shared';
 
 @Injectable()
@@ -44,7 +45,7 @@ export class WorkflowsService {
     };
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, currentUser: { id: string; email: string }) {
     const workflow = await this.prisma.workflow.findUnique({
       where: { id },
       include: {
@@ -63,7 +64,10 @@ export class WorkflowsService {
       });
     }
 
-    return workflow;
+    return {
+      ...workflow,
+      recipients: this.filterSelfRecipients(workflow.recipients, currentUser),
+    };
   }
 
   async create(input: CreateWorkflowInput, userId: string) {
@@ -198,6 +202,17 @@ export class WorkflowsService {
     }
 
     return { triggered, message, details, dryRun };
+  }
+
+  private filterSelfRecipients(
+    recipients: unknown,
+    currentUser: { id: string; email: string },
+  ): Recipient[] {
+    return parseRecipients(recipients).filter(
+      (r) =>
+        !(r.channel === 'IN_APP' && r.destination === currentUser.id) &&
+        !(r.channel === 'EMAIL' && r.destination === currentUser.email),
+    );
   }
 
   private async ensureExists(id: string) {

@@ -14,7 +14,8 @@
     "db:generate": "pnpm --filter @workflow-manager/prisma db:generate",
     "db:push": "pnpm --filter @workflow-manager/prisma db:push",
     "db:seed": "pnpm --filter @workflow-manager/prisma db:seed",
-    "db:migrate": "pnpm --filter @workflow-manager/prisma db:migrate"
+    "db:migrate": "pnpm --filter @workflow-manager/prisma db:migrate",
+    "db:fresh": "pnpm --filter @workflow-manager/prisma db:fresh"
   },
   "devDependencies": {
     "@eslint/js": "^9.18.0",

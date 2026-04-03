@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Info } from 'lucide-react';
 import { useWorkflowForm, type WorkflowFormData } from './use-workflow-form.hook';
 import { trpc } from '@/lib/trpc';
 
@@ -226,53 +226,68 @@ export function WorkflowForm({ initialData }: WorkflowFormProps = {}) {
                 Add Recipient
               </Button>
             </div>
+            <div className="flex items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--muted)] px-3 py-2">
+              <Info className="h-4 w-4 shrink-0 text-[var(--muted-foreground)]" />
+              <p className="text-sm text-[var(--muted-foreground)]">
+                {emailEnabled
+                  ? 'You will automatically receive notifications via in-app and email when this workflow triggers.'
+                  : 'You will automatically receive in-app notifications when this workflow triggers.'}
+              </p>
+            </div>
             {recipientsField.fields.length === 0 && (
               <p className="text-sm text-[var(--muted-foreground)]">
-                No recipients added. Events will still be created but no notifications will be sent.
+                No additional recipients. Only you will be notified.
               </p>
             )}
-            {recipientsField.fields.map((field, index) => (
-              <div key={field.id} className="flex items-end gap-2">
-                <div className="space-y-1">
-                  <Label className="text-xs">Channel</Label>
-                  <select
-                    className="flex h-9 rounded-md border bg-transparent px-3 py-1 text-sm"
-                    {...register(`recipients.${index}.channel`, {
-                      onChange: () => setValue(`recipients.${index}.destination`, ''),
-                    })}
-                  >
-                    <option value="IN_APP">In-App</option>
-                    {emailEnabled && <option value="EMAIL">Email</option>}
-                  </select>
-                </div>
-                <div className="flex-1 space-y-1">
-                  <Label className="text-xs">Destination</Label>
-                  <select
-                    className="flex h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm"
-                    {...register(`recipients.${index}.destination`)}
-                  >
-                    <option value="">Select a user</option>
-                    {(users ?? []).map((user) => {
-                      const isEmail = watch(`recipients.${index}.channel`) === 'EMAIL';
-                      return (
+            {recipientsField.fields.map((field, index) => {
+              const channel = watch(`recipients.${index}.channel`);
+              const destination = watch(`recipients.${index}.destination`);
+              const isEmail = channel === 'EMAIL';
+              return (
+                <div key={field.id} className="flex items-end gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Channel</Label>
+                    <select
+                      className="flex h-9 rounded-md border bg-transparent px-3 py-1 text-sm"
+                      {...register(`recipients.${index}.channel`, {
+                        onChange: () => setValue(`recipients.${index}.destination`, ''),
+                      })}
+                    >
+                      <option value="IN_APP">In-App</option>
+                      {emailEnabled && <option value="EMAIL">Email</option>}
+                    </select>
+                  </div>
+                  <div className="flex-1 space-y-1">
+                    <Label className="text-xs">Destination</Label>
+                    <select
+                      className="flex h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm"
+                      value={destination}
+                      onChange={(e) =>
+                        setValue(`recipients.${index}.destination`, e.target.value, {
+                          shouldValidate: true,
+                        })
+                      }
+                    >
+                      <option value="">Select a user</option>
+                      {(users ?? []).map((user) => (
                         <option key={user.id} value={isEmail ? user.email : user.id}>
                           {user.name} ({user.email})
                         </option>
-                      );
-                    })}
-                  </select>
+                      ))}
+                    </select>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 text-[var(--destructive)] hover:bg-[var(--destructive)]/10 hover:text-[var(--destructive)]"
+                    onClick={() => recipientsField.remove(index)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-9 w-9 text-[var(--destructive)] hover:bg-[var(--destructive)]/10 hover:text-[var(--destructive)]"
-                  onClick={() => recipientsField.remove(index)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {error && <p className="text-sm text-[var(--destructive)]">{error.message}</p>}

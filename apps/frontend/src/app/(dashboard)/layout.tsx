@@ -117,9 +117,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <p className="truncate text-sm font-medium text-[var(--sidebar-foreground)]">
                   {user.name}
                 </p>
-                <p className="truncate text-xs text-[var(--sidebar-foreground)]/60">
-                  {user.email}
-                </p>
+                <p className="truncate text-xs text-[var(--sidebar-foreground)]/60">{user.email}</p>
               </div>
               <Button
                 variant="ghost"

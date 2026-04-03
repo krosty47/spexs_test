@@ -23,6 +23,7 @@ export {
   triggerOperatorSchema,
   recipientSchema,
   recipientChannelSchema,
+  parseRecipients,
   workflowOutputSchema,
   workflowWithCountSchema,
   workflowListOutputSchema,

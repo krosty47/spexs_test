@@ -18,8 +18,10 @@ import {
   workflowOutputSchema,
   simulateWorkflowOutputSchema,
   triggerEventSchema,
+  resolveEventSchema,
   snoozeEventSchema,
   addCommentSchema,
+  eventIdSchema,
   eventListOutputSchema,
   eventDetailOutputSchema,
   eventOutputSchema,
@@ -67,9 +69,9 @@ const eventsRouter = t.router({
     .input(z.object({ pagination: paginationSchema, filters: eventFilterSchema.optional() }))
     .output(eventListOutputSchema)
     .query(() => null as any),
-  findOne: t.procedure.input(z.object({ id: z.string() })).output(eventDetailOutputSchema).query(() => null as any),
+  findOne: t.procedure.input(eventIdSchema).output(eventDetailOutputSchema).query(() => null as any),
   trigger: t.procedure.input(triggerEventSchema).output(eventOutputSchema).mutation(() => null as any),
-  resolve: t.procedure.input(z.object({ id: z.string() })).output(eventOutputSchema).mutation(() => null as any),
+  resolve: t.procedure.input(resolveEventSchema).output(eventOutputSchema).mutation(() => null as any),
   snooze: t.procedure.input(snoozeEventSchema).output(eventOutputSchema).mutation(() => null as any),
   addComment: t.procedure.input(addCommentSchema).output(addCommentOutputSchema).mutation(() => null as any),
 });

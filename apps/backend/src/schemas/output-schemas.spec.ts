@@ -258,6 +258,7 @@ describe('Output Schema Validation', () => {
       const result = trpcUserSchema.safeParse({
         id: 'user-1',
         email: 'test@test.com',
+        name: 'Test User',
         role: 'USER',
       });
       expect(result.success).toBe(true);

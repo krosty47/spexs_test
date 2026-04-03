@@ -8,6 +8,7 @@
     "db:generate": "dotenv -e ../../.env -- prisma generate",
     "db:push": "dotenv -e ../../.env -- prisma db push",
     "db:seed": "dotenv -e ../../.env -- tsx seed.ts",
+    "db:fresh": "dotenv -e ../../.env -- prisma db push --force-reset && dotenv -e ../../.env -- tsx seed.ts",
     "db:migrate": "dotenv -e ../../.env -- prisma migrate dev",
     "build": "tsc -p tsconfig.json"
   },

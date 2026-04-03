@@ -6,13 +6,12 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { MailerService } from '../mailer/services/mailer.service';
 import { eventTriggeredTemplate } from '../mailer/templates';
 import {
-  recipientSchema,
+  parseRecipients,
   type TriggerEventInput,
   type SnoozeEventInput,
   type PaginationInput,
   type EventFilterInput,
 } from '@workflow-manager/shared';
-import { z } from 'zod';
 
 @Injectable()
 export class EventsService {
@@ -92,7 +91,14 @@ export class EventsService {
     // Validate workflow exists and is active, include recipients and owner for notifications
     const workflow = await this.prisma.workflow.findUnique({
       where: { id: input.workflowId },
-      select: { id: true, isActive: true, name: true, recipients: true, userId: true },
+      select: {
+        id: true,
+        isActive: true,
+        name: true,
+        recipients: true,
+        userId: true,
+        user: { select: { email: true } },
+      },
     });
 
     if (!workflow) {
@@ -146,8 +152,7 @@ export class EventsService {
     });
 
     // Parse recipients from workflow
-    const parsed = z.array(recipientSchema).safeParse(workflow.recipients ?? []);
-    const recipients = parsed.success ? parsed.data : [];
+    const recipients = parseRecipients(workflow.recipients);
 
     // Notify via SSE after successful transaction (backward-compatible)
     this.notificationsService.notify(userId, 'event.triggered', {
@@ -174,10 +179,16 @@ export class EventsService {
       ),
     );
 
-    // Send emails to EMAIL channel recipients (fire-and-forget)
-    const emailRecipients = recipients.filter((r) => r.channel === 'EMAIL');
+    // Send emails to EMAIL channel recipients + workflow owner (fire-and-forget)
+    const emailDestinations = new Set(
+      recipients.filter((r) => r.channel === 'EMAIL').map((r) => r.destination),
+    );
+    // Always include workflow owner's email
+    if (workflow.user?.email) {
+      emailDestinations.add(workflow.user.email);
+    }
 
-    if (emailRecipients.length > 0) {
+    if (emailDestinations.size > 0) {
       const html = eventTriggeredTemplate({
         eventTitle: event.title,
         workflowName: workflow.name,
@@ -186,9 +197,9 @@ export class EventsService {
       });
 
       Promise.allSettled(
-        emailRecipients.map((r) =>
+        [...emailDestinations].map((to) =>
           this.mailerService.send({
-            to: r.destination,
+            to,
             subject: `Alert: ${event.title}`,
             html,
           }),

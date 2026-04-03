@@ -96,7 +96,9 @@ export function HistoryList() {
       )}
 
       {eventsQuery.error && (
-        <p className={`text-[var(--destructive)] ${CONTENT_PADDING_X}`}>Error: {eventsQuery.error.message}</p>
+        <p className={`text-[var(--destructive)] ${CONTENT_PADDING_X}`}>
+          Error: {eventsQuery.error.message}
+        </p>
       )}
 
       {eventsQuery.data && (

@@ -27,8 +27,8 @@ export class WorkflowsRouter {
   }
 
   @Query({ input: workflowIdSchema, output: workflowDetailOutputSchema })
-  async findOne(@Input() input: z.infer<typeof workflowIdSchema>) {
-    return this.workflowsService.findOne(input.id);
+  async findOne(@Input() input: z.infer<typeof workflowIdSchema>, @Ctx() ctx: AppContextType) {
+    return this.workflowsService.findOne(input.id, ctx.user!);
   }
 
   @Mutation({ input: createWorkflowSchema, output: workflowOutputSchema })

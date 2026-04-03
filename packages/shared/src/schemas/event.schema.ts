@@ -12,19 +12,19 @@ export type EventAction = z.infer<typeof eventActionSchema>;
 export const triggerEventSchema = z.object({
   title: z.string().min(3).max(200),
   payload: z.record(z.unknown()).default({}),
-  workflowId: z.string().min(1),
+  workflowId: z.string().cuid(),
 });
 
 export type TriggerEventInput = z.infer<typeof triggerEventSchema>;
 
 export const resolveEventSchema = z.object({
-  id: z.string().min(1),
+  id: z.string().cuid(),
 });
 
 export type ResolveEventInput = z.infer<typeof resolveEventSchema>;
 
 export const snoozeEventSchema = z.object({
-  id: z.string().min(1),
+  id: z.string().cuid(),
   until: z.coerce.date(),
   reason: z.string().max(500).optional(),
 });
@@ -32,7 +32,7 @@ export const snoozeEventSchema = z.object({
 export type SnoozeEventInput = z.infer<typeof snoozeEventSchema>;
 
 export const addCommentSchema = z.object({
-  eventId: z.string().min(1),
+  eventId: z.string().cuid(),
   content: z
     .string()
     .trim()
@@ -45,14 +45,14 @@ export const addCommentSchema = z.object({
 export type AddCommentInput = z.infer<typeof addCommentSchema>;
 
 export const eventIdSchema = z.object({
-  id: z.string().min(1),
+  id: z.string().cuid(),
 });
 
 export type EventIdInput = z.infer<typeof eventIdSchema>;
 
 export const eventFilterSchema = z.object({
   status: z.enum(['OPEN', 'RESOLVED', 'SNOOZED']).optional(),
-  workflowId: z.string().min(1).optional(),
+  workflowId: z.string().cuid().optional(),
 });
 
 export type EventFilterInput = z.infer<typeof eventFilterSchema>;

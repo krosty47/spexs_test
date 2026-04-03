@@ -107,7 +107,7 @@ export class AuthService {
     name: string;
     role: string;
   }): AuthResult {
-    const payload = { sub: user.id, email: user.email, role: user.role };
+    const payload = { sub: user.id, email: user.email, name: user.name, role: user.role };
 
     const accessToken = this.jwtService.sign(payload, {
       expiresIn: this.configService.getOrThrow<string>('JWT_EXPIRATION'),

@@ -38,6 +38,7 @@ export type AuthOutput = z.infer<typeof authOutputSchema>;
 export const trpcUserSchema = z.object({
   id: z.string(),
   email: z.string(),
+  name: z.string(),
   role: z.string(),
 });
 

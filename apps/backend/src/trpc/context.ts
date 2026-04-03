@@ -5,6 +5,7 @@ import { type TRPCContext, type ContextOptions } from 'nestjs-trpc';
 export interface TrpcUser {
   id: string;
   email: string;
+  name: string;
   role: string;
 }
 
@@ -38,6 +39,7 @@ export class AppContext implements TRPCContext {
         user = {
           id: payload.sub,
           email: payload.email,
+          name: payload.name,
           role: payload.role,
         };
       }

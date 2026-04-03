@@ -1,6 +1,7 @@
 import { Router, Query, Mutation, Input, Ctx, UseMiddlewares } from 'nestjs-trpc';
 import {
   triggerEventSchema,
+  resolveEventSchema,
   snoozeEventSchema,
   addCommentSchema,
   eventIdSchema,
@@ -48,8 +49,8 @@ export class EventsRouter {
     return this.eventsService.trigger(input, ctx.user?.id);
   }
 
-  @Mutation({ input: z.object({ id: z.string() }), output: eventOutputSchema })
-  async resolve(@Input() input: { id: string }, @Ctx() ctx: AppContextType) {
+  @Mutation({ input: resolveEventSchema, output: eventOutputSchema })
+  async resolve(@Input() input: z.infer<typeof resolveEventSchema>, @Ctx() ctx: AppContextType) {
     return this.eventsService.resolve(input.id, ctx.user!.id);
   }
 
