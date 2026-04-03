@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { PaginatedTable } from '@/components/paginated-table.component';
 import { StatusBadge } from '@/components/status-badge.component';
 import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ListSkeleton } from '@/components/list-skeleton.component';
 import { TableCell, TableRow } from '@/components/ui/table';
 import Link from 'next/link';
 import { CONTENT_PADDING_X } from '@/lib/utils';
@@ -53,7 +55,7 @@ export function HistoryList() {
   const totalPages = eventsQuery.data?.totalPages ?? 1;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
       {/* Filters */}
       <div className={`flex flex-col gap-3 sm:flex-row sm:items-center ${CONTENT_PADDING_X}`}>
         {/* Status filter */}
@@ -92,7 +94,14 @@ export function HistoryList() {
       </div>
 
       {eventsQuery.isLoading && (
-        <p className={`text-[var(--muted-foreground)] ${CONTENT_PADDING_X}`}>Loading history...</p>
+        <ListSkeleton
+          mobileCardFooter={() => (
+            <div className="mt-2 flex items-center justify-between">
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="h-8 w-16 rounded-md" />
+            </div>
+          )}
+        />
       )}
 
       {eventsQuery.error && (

@@ -7,8 +7,25 @@ import { PaginatedTable } from '@/components/paginated-table.component';
 import { StatusBadge } from '@/components/status-badge.component';
 import { TableCell, TableRow } from '@/components/ui/table';
 import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ListSkeleton } from '@/components/list-skeleton.component';
 import Link from 'next/link';
 import { CONTENT_PADDING_X } from '@/lib/utils';
+
+const FILTER_PLACEHOLDERS = Array.from({ length: 4 });
+
+function EventListSkeleton() {
+  return (
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className={`flex flex-wrap gap-2 pb-4 ${CONTENT_PADDING_X}`}>
+        {FILTER_PLACEHOLDERS.map((_, i) => (
+          <Skeleton key={i} className="h-8 w-16 rounded-md" />
+        ))}
+      </div>
+      <ListSkeleton />
+    </div>
+  );
+}
 
 const statusFilters = [
   { label: 'All', value: undefined },
@@ -29,7 +46,7 @@ export function EventList() {
   });
 
   if (eventsQuery.isLoading) {
-    return <p className="text-[var(--muted-foreground)]">Loading events...</p>;
+    return <EventListSkeleton />;
   }
 
   if (eventsQuery.error) {
@@ -48,7 +65,7 @@ export function EventList() {
   const totalPages = eventsQuery.data?.totalPages ?? 1;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div className={`flex flex-wrap gap-2 pb-4 ${CONTENT_PADDING_X}`}>
         {statusFilters.map((filter) => (
           <Button

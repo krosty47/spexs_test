@@ -7,9 +7,85 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { SnoozeDialog } from './snooze-dialog.component';
+
+const SKELETON_2 = Array.from({ length: 2 });
+
+function EventDetailSkeleton() {
+  return (
+    <div className="min-h-0 min-w-0 flex-1 space-y-6 overflow-y-auto p-4 sm:p-6">
+      {/* Header */}
+      <div className="flex items-start gap-3">
+        <Skeleton className="mt-1 h-8 w-8 rounded-md" />
+        <div className="min-w-0 space-y-2">
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-6 w-56 sm:h-7" />
+            <Skeleton className="h-5 w-14 rounded-full" />
+          </div>
+          <Skeleton className="h-4 w-32" />
+        </div>
+      </div>
+
+      {/* Actions card */}
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-5 w-16" />
+        </CardHeader>
+        <CardContent>
+          <Skeleton className="h-9 w-28 rounded-md" />
+        </CardContent>
+      </Card>
+
+      {/* Payload card */}
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-5 w-16" />
+        </CardHeader>
+        <CardContent>
+          <Skeleton className="h-28 w-full rounded-md" />
+        </CardContent>
+      </Card>
+
+      {/* Comments card */}
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-5 w-28" />
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {SKELETON_2.map((_, i) => (
+            <div key={i} className="space-y-2 rounded-md border p-3">
+              <div className="flex items-center justify-between">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-3 w-28" />
+              </div>
+              <Skeleton className="h-4 w-full" />
+            </div>
+          ))}
+          <Separator />
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Skeleton className="h-16 flex-1 rounded-md" />
+            <Skeleton className="h-9 w-full rounded-md sm:w-16" />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* History card */}
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-5 w-16" />
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {SKELETON_2.map((_, i) => (
+            <Skeleton key={i} className="h-6 w-full" />
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 interface EventDetailProps {
   eventId: string;
@@ -44,7 +120,7 @@ export function EventDetail({ eventId }: EventDetailProps) {
   });
 
   if (eventQuery.isLoading) {
-    return <p className="text-[var(--muted-foreground)]">Loading...</p>;
+    return <EventDetailSkeleton />;
   }
 
   if (eventQuery.error) {

@@ -23,10 +23,10 @@ export function PaginatedTable({
   onPageChange,
 }: PaginatedTableProps) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="min-h-0 flex-1 overflow-auto">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
         {/* Desktop table */}
-        <div className={`hidden md:block ${CONTENT_PADDING_X}`}>
+        <div className={`hidden overflow-x-auto md:block ${CONTENT_PADDING_X}`}>
           <table className="w-full caption-bottom text-sm">
             <TableHeader className="sticky top-0 z-10 bg-background">
               <TableRow>
@@ -40,7 +40,7 @@ export function PaginatedTable({
         </div>
 
         {/* Mobile cards */}
-        <div className={`grid gap-3 md:hidden ${CONTENT_PADDING_X}`}>{mobileCards}</div>
+        <div className={`grid min-w-0 gap-3 md:hidden ${CONTENT_PADDING_X}`}>{mobileCards}</div>
       </div>
 
       <div className="shrink-0 border-t bg-background">

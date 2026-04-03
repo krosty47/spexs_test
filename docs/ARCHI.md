@@ -64,6 +64,7 @@ Workflow Manager is a full-stack application for creating and managing alert wor
 | **Styling**          | Tailwind CSS            | 4.x     | Utility-first CSS                     |
 | **UI Kit**           | shadcn/ui               | latest  | Radix UI-based component library      |
 | **Security**         | @fastify/helmet         | latest  | HTTP security headers (CSP, etc.)     |
+| **Dev Mail**         | Mailpit                 | latest  | Local SMTP capture (dev email testing) |
 | **Containerization** | Docker + Docker Compose | -       | Local development environment         |
 
 ---
@@ -131,7 +132,7 @@ workflow-manager/
 │   ├── 4-unit-tests/
 │   └── 6-memo/
 │
-├── docker-compose.yml              # PostgreSQL (dev)
+├── docker-compose.yml              # PostgreSQL + Mailpit (dev)
 ├── turbo.json                      # Turborepo pipeline config
 ├── package.json                    # Root workspace config
 ├── GUIA_DE_DESARROLLO.md           # Development guide (Spanish)
@@ -212,8 +213,8 @@ pnpm --filter prisma db:migrate    # Run migrations
 | `JWT_REFRESH_SECRET` | Refresh token secret            | -                      |
 | `JWT_EXPIRATION`     | Access token TTL                | `1h`                   |
 | `COOKIE_DOMAIN`      | httpOnly cookie domain          | `localhost`            |
-| `SMTP_HOST`          | SMTP server hostname (optional) | -                      |
-| `SMTP_PORT`          | SMTP server port                | `587`                  |
+| `SMTP_HOST`          | SMTP server hostname (optional) | `localhost` (Mailpit)  |
+| `SMTP_PORT`          | SMTP server port                | `1025` (Mailpit)       |
 | `SMTP_SECURE`        | Use TLS for SMTP                | `false`                |
 | `SMTP_USER`          | SMTP auth username (optional)   | -                      |
 | `SMTP_PASS`          | SMTP auth password (optional)   | -                      |
@@ -236,7 +237,7 @@ pnpm --filter prisma db:migrate    # Run migrations
 ```typescript
 // app.router.ts - Root router merging all feature routers
 export const appRouter = router({
-  auth: authRouter,
+  auth: authRouter,       // login, register, me, logout
   workflows: workflowRouter,
   events: eventRouter,
   notifications: notificationRouter,
@@ -252,7 +253,7 @@ export type AppRouter = typeof appRouter;
 ```typescript
 // context.ts - Auth + DB injected into every procedure
 export const createContext = (req: FastifyRequest) => ({
-  user: req.user, // From JWT cookie
+  user: req.user, // From JWT cookie — includes { id, email, name, role }
   prisma: prismaClient, // Shared Prisma instance
 });
 ```
@@ -261,7 +262,7 @@ export const createContext = (req: FastifyRequest) => ({
 
 - **Public procedures**: Login, registration, health check
 - **Protected procedures**: All workflow/event operations (JWT guard)
-- **Input validation**: Zod schemas on every mutation and parameterized query
+- **Input validation**: Zod schemas on every mutation and parameterized query. ID fields use `z.string().cuid()` for strict CUID format validation instead of `z.string().min(1)`
 - **Output validation**: Zod output schemas on all 21 procedures via `@Query({ input, output })` / `@Mutation({ input, output })` decorators — runtime validation of return shapes
 - **Error handling**: tRPC error codes mapped to domain exceptions
 
@@ -317,15 +318,23 @@ Frontend types are derived from the backend router via `inferRouterOutputs<AppRo
 2. Backend validates → issues JWT access + refresh tokens
 3. Tokens stored in httpOnly secure cookies
 4. Every request: Next.js Middleware checks JWT exp → proactive refresh if expiring within 2 min
-5. Backend: cookie parsed → JWT verified → user injected into tRPC context
+5. Backend: cookie parsed → JWT verified → user injected into tRPC context (id, email, name, role)
 6. If middleware refresh fails → redirect to /login
+7. Logout: auth.logout mutation clears cookies (maxAge=0) → frontend redirects to /login
 ```
+
+### Logout
+
+- `auth.logout` mutation clears `access_token` and `refresh_token` cookies (sets `maxAge: 0`)
+- Sidebar displays current user info (name + email) with logout button at the bottom
+- Mobile header also shows user name + logout button
+- On success, redirects to `/login`
 
 ### Security Measures
 
 - **httpOnly cookies** - Tokens not accessible via JavaScript (XSS protection)
-- **Secure flag** - Cookies only sent over HTTPS in production
-- **SameSite=Strict** - CSRF protection
+- **Secure flag** - Cookies only sent over HTTPS in production (dynamic via `process.env.NODE_ENV`)
+- **SameSite=Lax** - CSRF protection
 - **Short-lived access tokens** (1 hour) with refresh rotation
 - **Next.js Middleware** proactive token refresh — decodes JWT `exp`, refreshes server-side before expiry (2-min buffer), client never sees 401
 - **Password hashing** - bcrypt with cost factor >= 12
@@ -375,7 +384,7 @@ Server-Sent Events (SSE) for pushing live notifications to connected clients. Us
 ### Channels
 
 1. **In-app** - Real-time via SSE, persisted in `Notification` model for history. IN_APP recipients are stored by user ID in the workflow's recipients array.
-2. **Email** - Via Nodemailer through `features/mailer/` module. SMTP-based (no API key required). Graceful degradation: when `SMTP_HOST` is not set, emails are skipped with a warning log. Fire-and-forget with `Promise.allSettled`. `MailerService` throws `TRPCError` for consistent error propagation.
+2. **Email** - Via Nodemailer through `features/mailer/` module. SMTP-based (no API key required). Graceful degradation: when `SMTP_HOST` is not set, emails are skipped with a warning log. Fire-and-forget with `Promise.allSettled`. `MailerService` throws `TRPCError` for consistent error propagation. Email notifications are sent to all EMAIL-channel recipients **plus the workflow owner** (deduplicated via `Set`).
 
 ### Email Templates
 
@@ -393,7 +402,9 @@ HTML email templates in `features/mailer/templates/` use table-based layouts for
 - `NotificationsService.notify()` — low-level SSE push (synchronous, no DB write)
 - tRPC router exposes `list` (paginated, with `unreadOnly` filter), `unreadCount`, `markAsRead` (with ownership validation), `markAllAsRead`
 - `markAsRead` uses optimized single `updateMany` query with FORBIDDEN/NOT_FOUND fallback
-- `EventsService.trigger()` sends in-app notifications to all IN_APP recipients (by user ID) + workflow owner (deduplicated via `Set`), and dispatches emails to EMAIL-channel recipients
+- `EventsService.trigger()` sends in-app notifications to all IN_APP recipients (by user ID) + workflow owner (deduplicated via `Set`), and dispatches emails to EMAIL-channel recipients + workflow owner's email (deduplicated via `Set`)
+- Recipients are parsed via shared `parseRecipients()` utility (safe Zod parse with empty-array fallback), replacing inline `z.array(recipientSchema).safeParse()` calls
+- `WorkflowsService.findOne()` filters out the current user's own recipient entries (both IN_APP and EMAIL channels) to avoid self-notification display in the UI
 - Notification metadata is typed via `notificationMetadataSchema` (`{ eventId, workflowId }`) at both Zod and application layer
 - `config.getFeatures` tRPC query exposes `{ emailEnabled }` so frontend conditionally shows/hides EMAIL option
 - `users.list` tRPC query returns registered users excluding the current user and system user
@@ -431,6 +442,14 @@ HTML email templates in `features/mailer/templates/` use table-based layouts for
 ---
 
 ## 14. Components & UI Architecture (Frontend)
+
+### Dashboard Layout
+
+- Full-height layout (`h-screen overflow-hidden`) with sticky sidebar and scrollable main content
+- **Sidebar**: sticky (`lg:sticky lg:top-0`), flexbox column with nav items + user info/logout at the bottom
+- **Header**: compact (`py-2`), shows hamburger menu on mobile + notification bell + user info (mobile only)
+- **Main content**: `overflow-hidden` container, pages manage their own scrolling
+- Current user fetched via `trpc.auth.me.useQuery()` (5-min stale time) and displayed in sidebar footer
 
 ### Component Organization
 
@@ -633,7 +652,7 @@ sequenceDiagram
 ### Development
 
 ```bash
-docker compose up -d    # PostgreSQL
+docker compose up -d    # PostgreSQL + Mailpit (SMTP on :1025, UI on :8025)
 pnpm install
 pnpm dev                # Runs both apps via Turborepo
 ```

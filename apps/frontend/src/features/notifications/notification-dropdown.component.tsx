@@ -5,6 +5,9 @@ import { trpc } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 import { notificationMetadataSchema } from '@workflow-manager/shared';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+
+const SKELETON_4 = Array.from({ length: 4 });
 
 interface NotificationItem {
   id: string;
@@ -99,8 +102,14 @@ export const NotificationDropdown = ({ onClose }: NotificationDropdownProps): Re
       {/* Notification list */}
       <div className="max-h-80 overflow-y-auto">
         {isLoading && (
-          <div className="px-4 py-6 text-center text-sm text-[var(--muted-foreground)]">
-            Loading...
+          <div className="space-y-0">
+            {SKELETON_4.map((_, i) => (
+              <div key={i} className="flex flex-col gap-1.5 border-b px-4 py-3">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-3 w-12" />
+              </div>
+            ))}
           </div>
         )}
 
