@@ -15,6 +15,7 @@ interface SnoozeDialogProps {
 }
 
 const PRESETS = [
+  { label: '1 min', ms: 60 * 1000 },
   { label: '15 min', ms: 15 * 60 * 1000 },
   { label: '30 min', ms: 30 * 60 * 1000 },
   { label: '1 hour', ms: 60 * 60 * 1000 },

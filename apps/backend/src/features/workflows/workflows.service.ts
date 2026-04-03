@@ -85,7 +85,7 @@ export class WorkflowsService {
         triggerType: input.triggerType,
         triggerConfig: input.triggerConfig ?? undefined,
         outputMessage: input.outputMessage,
-        recipients: input.recipients ?? [],
+        recipients: this.deduplicateRecipients(input.recipients ?? []),
         userId,
       },
     });
@@ -111,7 +111,9 @@ export class WorkflowsService {
 
     if (input.recipients !== undefined) {
       data.recipients =
-        input.recipients === null ? Prisma.DbNull : (input.recipients as Prisma.InputJsonValue);
+        input.recipients === null
+          ? Prisma.DbNull
+          : (this.deduplicateRecipients(input.recipients) as unknown as Prisma.InputJsonValue);
     }
 
     return this.prisma.workflow.update({
@@ -219,6 +221,17 @@ export class WorkflowsService {
         !(r.channel === 'IN_APP' && r.destination === currentUser.id) &&
         !(r.channel === 'EMAIL' && r.destination === currentUser.email),
     );
+  }
+
+  /** Deduplicate recipients by channel+destination */
+  private deduplicateRecipients(recipients: Recipient[]): Recipient[] {
+    const seen = new Set<string>();
+    return recipients.filter((r) => {
+      const key = `${r.channel}:${r.destination}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   }
 
   private async ensureExists(id: string) {

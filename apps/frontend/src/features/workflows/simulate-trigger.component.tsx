@@ -23,7 +23,14 @@ export function SimulateTrigger({
   const [metricValue, setMetricValue] = useState<string>('');
   const [eventTitle, setEventTitle] = useState<string>('');
   const [dryRun, setDryRun] = useState(true);
-  const simulateMutation = trpc.workflows.simulate.useMutation();
+  const utils = trpc.useUtils();
+  const simulateMutation = trpc.workflows.simulate.useMutation({
+    onSuccess: (data) => {
+      if (data.triggered && !data.dryRun) {
+        void utils.workflows.findOne.invalidate({ id: workflowId });
+      }
+    },
+  });
 
   const handleSimulate = () => {
     const value = parseFloat(metricValue);

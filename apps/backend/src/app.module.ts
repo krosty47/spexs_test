@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { resolve } from 'path';
 import { validate } from './config/env.validation';
 import { PrismaModule } from './database/prisma.module';
@@ -22,6 +23,7 @@ import { UsersModule } from './features/users/users.module';
       validate,
     }),
     ScheduleModule.forRoot(),
+    EventEmitterModule.forRoot(),
     PrismaModule,
     TrpcModule,
     AuthModule,

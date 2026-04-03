@@ -9,6 +9,8 @@ interface UseSSEOptions {
   withCredentials?: boolean;
   /** Callback when a message is received */
   onMessage?: (event: MessageEvent) => void;
+  /** Comma-separated named SSE event types to listen for (in addition to the default 'message' event) */
+  eventTypes?: string;
   /** Whether the SSE connection is enabled */
   enabled?: boolean;
 }
@@ -29,6 +31,7 @@ export function useSSE({
   url,
   withCredentials = false,
   onMessage,
+  eventTypes = '',
   enabled = true,
 }: UseSSEOptions): UseSSEReturn {
   const [readyState, setReadyState] = useState<number>(2); // CLOSED
@@ -43,13 +46,22 @@ export function useSSE({
 
     const eventSource = new EventSource(url, { withCredentials });
 
+    const handler = (event: MessageEvent) => {
+      onMessageRef.current?.(event);
+    };
+
     eventSource.onopen = () => {
       setReadyState(1);
     };
 
-    eventSource.onmessage = (event: MessageEvent) => {
-      onMessageRef.current?.(event);
-    };
+    // Listen for default (unnamed) messages
+    eventSource.onmessage = handler;
+
+    // Listen for named event types (SSE events sent with `event: <type>`)
+    const types = eventTypes ? eventTypes.split(',') : [];
+    for (const type of types) {
+      eventSource.addEventListener(type, handler);
+    }
 
     eventSource.onerror = () => {
       setReadyState(eventSource.readyState);
@@ -61,10 +73,13 @@ export function useSSE({
     setReadyState(eventSource.readyState);
 
     return () => {
+      for (const type of types) {
+        eventSource.removeEventListener(type, handler);
+      }
       eventSource.close();
       setReadyState(2);
     };
-  }, [url, withCredentials, enabled]);
+  }, [url, withCredentials, enabled, eventTypes]);
 
   return {
     isConnected: readyState === 1,

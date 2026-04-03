@@ -141,6 +141,7 @@ describe('Output Schema Validation', () => {
           },
         ],
         _count: { events: 1 },
+        hasUnresolvedEvent: false,
       });
       expect(result.success).toBe(true);
     });
@@ -341,9 +342,11 @@ describe('Output Schema Validation', () => {
   // --- Comment Sanitization ---
 
   describe('addCommentSchema content sanitization', () => {
+    const validEventId = 'clrec3aai0000mc04z0z0z0z0';
+
     it('should trim whitespace from content', () => {
       const result = addCommentSchema.parse({
-        eventId: 'ev-1',
+        eventId: validEventId,
         content: '  Hello world  ',
       });
       expect(result.content).toBe('Hello world');
@@ -351,7 +354,7 @@ describe('Output Schema Validation', () => {
 
     it('should strip HTML tags from content', () => {
       const result = addCommentSchema.parse({
-        eventId: 'ev-1',
+        eventId: validEventId,
         content: 'Hello <script>alert("xss")</script>world',
       });
       expect(result.content).toBe('Hello alert("xss")world');
@@ -359,7 +362,7 @@ describe('Output Schema Validation', () => {
 
     it('should reject empty string after trim', () => {
       const result = addCommentSchema.safeParse({
-        eventId: 'ev-1',
+        eventId: validEventId,
         content: '   ',
       });
       expect(result.success).toBe(false);
@@ -367,7 +370,7 @@ describe('Output Schema Validation', () => {
 
     it('should reject HTML-only content that becomes empty after stripping', () => {
       const result = addCommentSchema.safeParse({
-        eventId: 'ev-1',
+        eventId: validEventId,
         content: '<b></b><i></i>',
       });
       expect(result.success).toBe(false);
@@ -375,7 +378,7 @@ describe('Output Schema Validation', () => {
 
     it('should preserve normal text without HTML', () => {
       const result = addCommentSchema.parse({
-        eventId: 'ev-1',
+        eventId: validEventId,
         content: 'This is a normal comment with some punctuation! And numbers: 123.',
       });
       expect(result.content).toBe(

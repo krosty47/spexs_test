@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { TRPCError } from '@trpc/server';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
@@ -26,6 +27,7 @@ export class EventsService {
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
     private readonly mailerService: MailerService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async findAll(pagination: PaginationInput, filters?: EventFilterInput) {
@@ -158,14 +160,8 @@ export class EventsService {
     // Parse recipients from workflow
     const recipients = parseRecipients(workflow.recipients);
 
-    // Notify via SSE after successful transaction (backward-compatible)
-    this.notificationsService.notify(userId, 'event.triggered', {
-      eventId: event.id,
-      title: event.title,
-      workflowId: event.workflowId,
-    });
-
     // Send in-app notifications to workflow owner + IN_APP recipients
+    // send() writes to DB first, then pushes SSE — ensures the unread count is up-to-date
     const inAppRecipientIds = recipients
       .filter((r) => r.channel === 'IN_APP')
       .map((r) => r.destination);
@@ -182,6 +178,9 @@ export class EventsService {
         }),
       ),
     );
+
+    // SSE broadcast to all notified users so their tables/badges update in real-time
+    this.broadcastSseToUsers(notifyUserIds, 'event.triggered', event);
 
     // Send emails to EMAIL channel recipients + workflow owner (fire-and-forget)
     const emailDestinations = new Set(
@@ -208,8 +207,11 @@ export class EventsService {
             html,
           }),
         ),
-      ).catch((err) => {
-        this.logger.error('Unexpected error sending notification emails', err);
+      ).then((results) => {
+        const failed = results.filter((r) => r.status === 'rejected');
+        if (failed.length > 0) {
+          this.logger.error(`${failed.length} email(s) failed for event.triggered`);
+        }
       });
     }
 
@@ -246,6 +248,9 @@ export class EventsService {
 
       return updated;
     });
+
+    // Cancel any scheduled snooze timeout for this event
+    this.eventEmitter.emit('snooze.cleared', { eventId: id });
 
     // Send notifications (fire-and-forget)
     const [workflow, user] = await Promise.all([
@@ -314,6 +319,9 @@ export class EventsService {
       return updated;
     });
 
+    // Schedule precise timeout to reopen when snooze expires
+    this.eventEmitter.emit('snooze.scheduled', { eventId: id, until: input.until });
+
     // Send notifications (fire-and-forget)
     const workflow = await this.getWorkflowForNotifications(snoozed.workflowId);
     if (workflow) {
@@ -372,14 +380,8 @@ export class EventsService {
       params;
     const recipients = parseRecipients(workflow.recipients);
 
-    // SSE notification
-    this.notificationsService.notify(userId, sseEvent, {
-      eventId: event.id,
-      title: event.title,
-      workflowId: event.workflowId,
-    });
-
     // In-app notifications to owner + IN_APP recipients
+    // send() writes to DB first, then pushes SSE — ensures the unread count is up-to-date
     const inAppRecipientIds = recipients
       .filter((r) => r.channel === 'IN_APP')
       .map((r) => r.destination);
@@ -395,9 +397,13 @@ export class EventsService {
           metadata: { eventId: event.id, workflowId: event.workflowId },
         }),
       ),
-    ).catch((err) => {
-      this.logger.error(`Error sending in-app notifications for ${sseEvent}`, err);
-    });
+    )
+      .catch((err) => {
+        this.logger.error(`Error sending in-app notifications for ${sseEvent}`, err);
+      })
+      .finally(() => {
+        this.broadcastSseToUsers(notifyUserIds, sseEvent, event);
+      });
 
     // Emails to EMAIL recipients + workflow owner (fire-and-forget)
     const emailDestinations = new Set(
@@ -418,6 +424,17 @@ export class EventsService {
           this.logger.error(`${failed.length} email(s) failed for ${sseEvent}`);
         }
       });
+    }
+  }
+
+  private broadcastSseToUsers(
+    userIds: Set<string>,
+    sseEvent: string,
+    event: { id: string; title: string; workflowId: string },
+  ) {
+    const payload = { eventId: event.id, title: event.title, workflowId: event.workflowId };
+    for (const uid of userIds) {
+      this.notificationsService.notify(uid, sseEvent, payload);
     }
   }
 

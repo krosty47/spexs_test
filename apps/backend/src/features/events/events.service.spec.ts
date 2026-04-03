@@ -1,6 +1,7 @@
 import { Test, type TestingModule } from '@nestjs/testing';
 import { mockDeep, type DeepMockProxy } from 'jest-mock-extended';
 import { type PrismaClient } from '@prisma/client';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { EventsService } from './events.service';
 import { PrismaService } from '../../database/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -91,6 +92,7 @@ describe('EventsService', () => {
   let prisma: DeepMockProxy<PrismaClient>;
   let notificationsService: { notify: jest.Mock; send: jest.Mock };
   let mailerService: { send: jest.Mock };
+  let eventEmitter: { emit: jest.Mock };
 
   beforeEach(async () => {
     notificationsService = {
@@ -98,6 +100,7 @@ describe('EventsService', () => {
       send: jest.fn().mockResolvedValue(undefined),
     };
     mailerService = { send: jest.fn().mockResolvedValue({ id: 'email-1' }) };
+    eventEmitter = { emit: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -105,6 +108,7 @@ describe('EventsService', () => {
         { provide: PrismaService, useValue: mockDeep<PrismaClient>() },
         { provide: NotificationsService, useValue: notificationsService },
         { provide: MailerService, useValue: mailerService },
+        { provide: EventEmitter2, useValue: eventEmitter },
       ],
     }).compile();
 

@@ -77,8 +77,8 @@ workflow-manager/
 │   ├── backend/                    # NestJS + tRPC API
 │   │   └── src/
 │   │       ├── features/           # Feature modules (domain-driven)
-│   │       │   ├── workflows/      # CRUD, activate/deactivate
-│   │       │   ├── events/         # Trigger, history, resolve, snooze, snooze-expiration cron
+│   │       │   ├── workflows/      # CRUD, activate/deactivate, recipient dedup
+│   │       │   ├── events/         # Trigger, history, resolve, snooze, snooze-expiration (hybrid)
 │   │       │   ├── notifications/  # In-app + email channels
 │   │       │   ├── mailer/         # Nodemailer SMTP transport + HTML templates
 │   │       │   ├── config/         # App config feature flags
@@ -112,7 +112,8 @@ workflow-manager/
 │           ├── components/         # Shared UI components (shadcn)
 │           ├── lib/
 │           │   ├── trpc.ts         # tRPC client setup
-│           │   └── trpc-types.ts   # inferRouterOutputs<AppRouter> type aliases
+│           │   ├── trpc-types.ts   # inferRouterOutputs<AppRouter> type aliases
+│           │   └── use-sse.hook.ts # Generic SSE hook with named event support
 │           └── types/              # Shared TypeScript types
 │
 ├── packages/
@@ -355,8 +356,8 @@ Server-Sent Events (SSE) for pushing live notifications to connected clients. Us
 
 ### Use Cases
 
-- New alert triggered → push notification to workflow owner
-- Event resolved/snoozed → update connected clients
+- New alert triggered → push notification to workflow owner + all IN_APP recipients
+- Event resolved/snoozed/reopened → update all connected recipients
 - Notification delivery → instant in-app notification with bell badge update
 
 ### Architecture
@@ -373,9 +374,25 @@ Server-Sent Events (SSE) for pushing live notifications to connected clients. Us
 - SSE controller protected by `JwtCookieGuard` (extracts userId from httpOnly JWT cookie)
 - Multiple tabs supported: each connection gets its own Subject, cleaned up on disconnect
 - Native `EventSource` auto-reconnection (~3s) — no custom retry logic needed
-- Frontend uses a two-layer hook architecture:
-  - `useSSE` — generic, SSR-safe, reusable for any SSE endpoint
-  - `useNotifications` — wraps `useSSE`, invalidates tRPC notification queries on each message
+
+### Named SSE Events
+
+The backend emits **named SSE events** (using `event:` field in SSE protocol) instead of generic `message` events:
+
+- `notification.created` — new notification persisted
+- `event.triggered` — new event created from workflow trigger
+- `event.resolved` — event marked as resolved
+- `event.snoozed` — event snoozed
+- `event.reopened` — snoozed event reopened (snooze expired)
+
+### SSE Broadcasting
+
+`EventsService` uses a private `broadcastSseToUsers()` helper to send SSE events to **all notified users** (workflow owner + IN_APP recipients), not just the acting user. This ensures system-initiated actions (e.g. snooze expiry by `SnoozeExpirationService`) reach real browser connections.
+
+### Frontend Hook Architecture
+
+- `useSSE` — generic, SSR-safe, reusable for any SSE endpoint. Accepts an `eventTypes` parameter (comma-separated string) to register named `EventSource.addEventListener()` listeners alongside the default `onmessage` handler. Cleanup removes all listeners on teardown.
+- `useNotifications` — wraps `useSSE` with the named event types above. Invalidates tRPC notification queries on each message. For `event.*` SSE events, parses the event payload JSON to scope `workflows.findOne.invalidate()` to the specific `workflowId` (falls back to broad invalidation if parsing fails).
 
 ---
 
@@ -394,7 +411,9 @@ HTML email templates in `features/mailer/templates/` use table-based layouts for
 - `eventTriggeredTemplate()` — red alert badge, event details, optional payload metrics table
 - `eventResolvedTemplate()` — green resolved badge with timestamp
 - `eventSnoozedTemplate()` — amber snoozed badge with until time
+- `eventReopenedTemplate()` — orange reopened badge, used when snooze expires
 - `dailySummaryTemplate()` — blue badge, stat cards, per-workflow detail table
+- All templates share an `escapeHtml()` utility from `base-layout.ts` for XSS prevention
 
 ### Architecture
 
@@ -402,8 +421,10 @@ HTML email templates in `features/mailer/templates/` use table-based layouts for
 - `NotificationsService.notify()` — low-level SSE push (synchronous, no DB write)
 - tRPC router exposes `list` (paginated, with `unreadOnly` filter), `unreadCount`, `markAsRead` (with ownership validation), `markAllAsRead`
 - `markAsRead` uses optimized single `updateMany` query with FORBIDDEN/NOT_FOUND fallback
-- `EventsService.trigger()` sends in-app notifications to all IN_APP recipients (by user ID) + workflow owner (deduplicated via `Set`), and dispatches emails to EMAIL-channel recipients + workflow owner's email (deduplicated via `Set`)
+- `EventsService.trigger()` sends in-app notifications to all IN_APP recipients (by user ID) + workflow owner (deduplicated via `Set`), and dispatches emails to EMAIL-channel recipients + workflow owner's email (deduplicated via `Set`). SSE is broadcast to all notified users via `broadcastSseToUsers()`.
+- `EventsService.sendStatusNotifications()` — shared helper for resolve/snooze/reopen status changes. Sends in-app + email + SSE to all relevant users. Used by both direct user actions and system-initiated actions (snooze expiry).
 - Recipients are parsed via shared `parseRecipients()` utility (safe Zod parse with empty-array fallback), replacing inline `z.array(recipientSchema).safeParse()` calls
+- **Recipient deduplication** — `WorkflowsService` deduplicates recipients at the API level via a private `deduplicateRecipients()` method (Set-based `channel:destination` key), applied in both `create()` and `update()`. Schemas stay pure validation with no transforms.
 - `WorkflowsService.findOne()` filters out the current user's own recipient entries (both IN_APP and EMAIL channels) to avoid self-notification display in the UI
 - Notification metadata is typed via `notificationMetadataSchema` (`{ eventId, workflowId }`) at both Zod and application layer
 - `config.getFeatures` tRPC query exposes `{ emailEnabled }` so frontend conditionally shows/hides EMAIL option
@@ -419,13 +440,21 @@ HTML email templates in `features/mailer/templates/` use table-based layouts for
 
 ## 13. Background Jobs
 
-### Snooze Expiration (Cron)
+### Snooze Expiration (Hybrid: setTimeout + Cron Safety Net)
 
-- `SnoozeExpirationService` in `features/events/` runs every 5 minutes via `@Cron('*/5 * * * *')`
-- Queries SNOOZED events with `snooze.until <= now()` using indexed `until` column
-- In a transaction: sets status to OPEN, creates REOPENED history entry, deletes Snooze record
-- Notifies via `NotificationsService` for each reopened event
-- Requires `ScheduleModule.forRoot()` registered in `AppModule`
+`SnoozeExpirationService` uses a three-layer hybrid approach for precise snooze expiration:
+
+1. **Precise `setTimeout`** — When a snooze is created, `EventsService` emits a `snooze.scheduled` event via `@nestjs/event-emitter`. `SnoozeExpirationService` listens via `@OnEvent('snooze.scheduled')` and registers a `setTimeout` with the exact delay. Managed through NestJS `SchedulerRegistry` for cleanup. Cancelled via `snooze.cleared` event when an event is resolved before snooze expiry.
+
+2. **Safety-net `CronJob`** — A configurable cron (`SNOOZE_CRON` env, default `*/15 * * * *`) catches any expired snoozes missed during server restarts or scheduling gaps. Queries SNOOZED events with `snooze.until <= now()`.
+
+3. **DB rehydration on boot** — `onModuleInit()` queries all active snoozes from DB and re-schedules their precise timeouts. Logs a warning if count exceeds 1000 (scaling consideration).
+
+Processing flow per expired snooze (`processExpiredSnooze`):
+- Verifies event is still SNOOZED (idempotent)
+- Transaction: sets status to OPEN, creates REOPENED history entry, deletes Snooze record
+- Sends notifications (in-app + email + SSE) to all recipients via `EventsService.sendStatusNotifications()` with `userId: 'system'`
+- Requires `ScheduleModule.forRoot()` and `EventEmitterModule.forRoot()` registered in `AppModule`
 
 ### Daily Summary (Cron)
 
@@ -463,6 +492,8 @@ HTML email templates in `features/mailer/templates/` use table-based layouts for
 - Client Components only when interactivity is needed (`"use client"`)
 - Feature components own their hooks, types, and sub-components
 - Barrel exports (`index.ts`) for clean imports
+- **Controlled components** — form inputs use `useState` + `value`/`onChange` (never `document.getElementById`)
+- **`useMemo` for O(1) lookups** — user lists are indexed into `Map<string, User>` via `useMemo` for efficient recipient display resolution (e.g. `userById` Map keyed by both `id` and `email`)
 
 ---
 
@@ -534,7 +565,7 @@ sequenceDiagram
     participant WFS as WorkflowService
     participant ES as EventService
     participant NS as NotificationService
-    participant WS as WebSocket Gateway
+    participant SSE as SSE (per-user)
     participant DB as PostgreSQL
 
     Trigger->>API: mutation: events.trigger({ workflowId, data })
@@ -544,12 +575,14 @@ sequenceDiagram
     API->>ES: Create event (with deduplication check)
     ES->>DB: Check for existing open event
     alt No duplicate
-        ES->>DB: Insert new event
-        ES->>NS: Notify subscribers
-        NS->>WS: Push real-time notification
-        NS->>SMTP: Send email via Nodemailer (async)
+        ES->>DB: Insert new event + history (transaction)
+        ES->>NS: Send in-app notifications (owner + IN_APP recipients)
+        NS->>DB: Persist notifications
+        ES->>ES: broadcastSseToUsers(notifyUserIds)
+        ES->>SSE: Push named SSE event to each recipient
+        ES->>SMTP: Send email via Nodemailer (fire-and-forget)
     else Duplicate exists
-        ES-->>API: Return existing event
+        ES-->>API: CONFLICT error
     end
     API-->>Trigger: Event response
 ```
@@ -673,7 +706,7 @@ Workflow Manager is a type-safe full-stack monorepo application designed around 
 
 1. **Developer experience** - Types flow from DB to UI with zero manual sync
 2. **Modularity** - Features and external integrations are independent, testable modules
-3. **Real-time** - Alerts are delivered instantly via WebSocket
+3. **Real-time** - Alerts are delivered instantly via SSE with named events broadcast to all recipients
 4. **Security** - httpOnly JWT cookies, input validation at every boundary, CORS + Helmet
 
 Key architectural decisions:

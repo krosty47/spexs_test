@@ -1,12 +1,4 @@
-import { baseLayout } from './base-layout';
-
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
+import { baseLayout, escapeHtml } from './base-layout';
 
 export interface EventSnoozedData {
   eventTitle: string;

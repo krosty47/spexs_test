@@ -7,53 +7,26 @@ import { SnoozeExpirationService } from './snooze-expiration.service';
 import { PrismaService } from '../../database/prisma.service';
 import { EventsService } from './events.service';
 
-const pastDate = new Date(Date.now() - 3600000); // 1 hour ago
-
 const mockWorkflow = {
+  id: 'wf-1',
   name: 'Test Workflow',
   userId: 'user-owner',
   recipients: [{ channel: 'IN_APP', destination: 'user-2' }],
 };
 
-const mockSnoozedEvent = {
+const mockSnoozedEventDetail = {
   id: 'evt-1',
   title: 'Snoozed Event',
-  payload: { key: 'value' },
   status: 'SNOOZED' as const,
-  createdAt: new Date(),
-  updatedAt: new Date(),
   workflowId: 'wf-1',
-  resolvedAt: null,
-  resolvedById: null,
-  snooze: {
-    id: 'snooze-1',
-    until: pastDate,
-    reason: 'Maintenance',
-    createdAt: new Date(),
-    eventId: 'evt-1',
-    userId: 'user-1',
-  },
   workflow: mockWorkflow,
 };
 
-const mockSnoozedEvent2 = {
+const mockSnoozedEventDetail2 = {
   id: 'evt-2',
   title: 'Snoozed Event 2',
-  payload: {},
   status: 'SNOOZED' as const,
-  createdAt: new Date(),
-  updatedAt: new Date(),
   workflowId: 'wf-2',
-  resolvedAt: null,
-  resolvedById: null,
-  snooze: {
-    id: 'snooze-2',
-    until: pastDate,
-    reason: null,
-    createdAt: new Date(),
-    eventId: 'evt-2',
-    userId: 'user-2',
-  },
   workflow: mockWorkflow,
 };
 
@@ -73,10 +46,7 @@ function setupTransaction(
 }
 
 function setupTxMockDefaults(txMock: DeepMockProxy<PrismaClient>) {
-  txMock.event.update.mockResolvedValue({
-    ...mockSnoozedEvent,
-    status: 'OPEN' as const,
-  } as never);
+  txMock.event.update.mockResolvedValue({ status: 'OPEN' } as never);
   txMock.eventHistory.create.mockResolvedValue({
     id: 'hist-1',
     action: 'REOPENED',
@@ -84,7 +54,7 @@ function setupTxMockDefaults(txMock: DeepMockProxy<PrismaClient>) {
     eventId: 'evt-1',
     userId: 'system',
   });
-  txMock.snooze.delete.mockResolvedValue(mockSnoozedEvent.snooze as never);
+  txMock.snooze.delete.mockResolvedValue({} as never);
 }
 
 describe('SnoozeExpirationService', () => {
@@ -102,10 +72,14 @@ describe('SnoozeExpirationService', () => {
         SnoozeExpirationService,
         { provide: PrismaService, useValue: mockDeep<PrismaClient>() },
         { provide: EventsService, useValue: eventsService },
-        { provide: ConfigService, useValue: { get: () => '*/5 * * * *' } },
+        { provide: ConfigService, useValue: { get: () => '*/15 * * * *' } },
         {
           provide: SchedulerRegistry,
-          useValue: { addCronJob: jest.fn() },
+          useValue: {
+            addCronJob: jest.fn(),
+            addTimeout: jest.fn(),
+            deleteTimeout: jest.fn(),
+          },
         },
       ],
     }).compile();
@@ -118,7 +92,8 @@ describe('SnoozeExpirationService', () => {
     it('should reopen events with expired snoozes', async () => {
       const txMock = createTxMock();
       setupTxMockDefaults(txMock);
-      prisma.event.findMany.mockResolvedValue([mockSnoozedEvent] as never);
+      prisma.event.findMany.mockResolvedValue([{ id: 'evt-1' }] as never);
+      prisma.event.findUnique.mockResolvedValue(mockSnoozedEventDetail as never);
       setupTransaction(prisma, txMock);
 
       await service.handleExpiredSnoozes();
@@ -132,7 +107,8 @@ describe('SnoozeExpirationService', () => {
     it('should create REOPENED history entry', async () => {
       const txMock = createTxMock();
       setupTxMockDefaults(txMock);
-      prisma.event.findMany.mockResolvedValue([mockSnoozedEvent] as never);
+      prisma.event.findMany.mockResolvedValue([{ id: 'evt-1' }] as never);
+      prisma.event.findUnique.mockResolvedValue(mockSnoozedEventDetail as never);
       setupTransaction(prisma, txMock);
 
       await service.handleExpiredSnoozes();
@@ -149,7 +125,8 @@ describe('SnoozeExpirationService', () => {
     it('should delete the Snooze record', async () => {
       const txMock = createTxMock();
       setupTxMockDefaults(txMock);
-      prisma.event.findMany.mockResolvedValue([mockSnoozedEvent] as never);
+      prisma.event.findMany.mockResolvedValue([{ id: 'evt-1' }] as never);
+      prisma.event.findUnique.mockResolvedValue(mockSnoozedEventDetail as never);
       setupTransaction(prisma, txMock);
 
       await service.handleExpiredSnoozes();
@@ -161,16 +138,11 @@ describe('SnoozeExpirationService', () => {
 
     it('should call sendStatusNotifications for each reopened event', async () => {
       const txMock = createTxMock();
-      txMock.event.update.mockResolvedValue({ status: 'OPEN' } as never);
-      txMock.eventHistory.create.mockResolvedValue({
-        id: 'hist-1',
-        action: 'REOPENED',
-        createdAt: new Date(),
-        eventId: 'evt-1',
-        userId: 'system',
-      });
-      txMock.snooze.delete.mockResolvedValue({} as never);
-      prisma.event.findMany.mockResolvedValue([mockSnoozedEvent, mockSnoozedEvent2] as never);
+      setupTxMockDefaults(txMock);
+      prisma.event.findMany.mockResolvedValue([{ id: 'evt-1' }, { id: 'evt-2' }] as never);
+      prisma.event.findUnique
+        .mockResolvedValueOnce(mockSnoozedEventDetail as never)
+        .mockResolvedValueOnce(mockSnoozedEventDetail2 as never);
       setupTransaction(prisma, txMock);
 
       await service.handleExpiredSnoozes();
@@ -192,6 +164,19 @@ describe('SnoozeExpirationService', () => {
       );
     });
 
+    it('should skip events that are no longer snoozed', async () => {
+      prisma.event.findMany.mockResolvedValue([{ id: 'evt-1' }] as never);
+      prisma.event.findUnique.mockResolvedValue({
+        ...mockSnoozedEventDetail,
+        status: 'RESOLVED',
+      } as never);
+
+      await service.handleExpiredSnoozes();
+
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(eventsService.sendStatusNotifications).not.toHaveBeenCalled();
+    });
+
     it('should handle empty result set gracefully', async () => {
       prisma.event.findMany.mockResolvedValue([]);
 
@@ -201,7 +186,7 @@ describe('SnoozeExpirationService', () => {
       expect(eventsService.sendStatusNotifications).not.toHaveBeenCalled();
     });
 
-    it('should not touch snoozes with future until date', async () => {
+    it('should query only snoozed events with expired until date', async () => {
       prisma.event.findMany.mockResolvedValue([]);
 
       await service.handleExpiredSnoozes();
@@ -214,6 +199,28 @@ describe('SnoozeExpirationService', () => {
               until: expect.objectContaining({ lte: expect.any(Date) }),
             }),
           }),
+        }),
+      );
+    });
+  });
+
+  describe('scheduleSnoozeTimeout', () => {
+    it('should process immediately when snooze is already expired', async () => {
+      const pastDate = new Date(Date.now() - 1000);
+      prisma.event.findUnique.mockResolvedValue(mockSnoozedEventDetail as never);
+      const txMock = createTxMock();
+      setupTxMockDefaults(txMock);
+      setupTransaction(prisma, txMock);
+
+      service.scheduleSnoozeTimeout('evt-1', pastDate);
+
+      // Give the async processExpiredSnooze time to run
+      await new Promise((r) => setTimeout(r, 50));
+
+      expect(eventsService.sendStatusNotifications).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: expect.objectContaining({ id: 'evt-1' }),
+          type: 'EVENT_REOPENED',
         }),
       );
     });

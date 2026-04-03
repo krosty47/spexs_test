@@ -87,7 +87,10 @@ async function main() {
     triggerConfig: { type: 'THRESHOLD', metric: 'wa_response_time_ms', operator: '>', value: 5000 },
     outputMessage:
       'Your chatbot is taking too long to reply ({{value}}ms). Users expect answers in under 5 seconds — check if your bot or the WhatsApp API is running slow.',
-    recipients: [],
+    recipients: [
+      { channel: 'IN_APP', destination: adminUser.id },
+      { channel: 'EMAIL', destination: adminUser.email },
+    ],
   };
   const workflow1 = await prisma.workflow.upsert({
     where: { id: SEED_IDS.workflow1 },
@@ -114,7 +117,10 @@ async function main() {
     },
     outputMessage:
       '{{value}}% of your messages are failing to deliver. This usually means a problem with the WhatsApp API or your message templates.',
-    recipients: [],
+    recipients: [
+      { channel: 'IN_APP', destination: adminUser.id },
+      { channel: 'EMAIL', destination: adminUser.email },
+    ],
   };
   const workflow2 = await prisma.workflow.upsert({
     where: { id: SEED_IDS.workflow2 },
@@ -136,7 +142,10 @@ async function main() {
     triggerConfig: { type: 'VARIANCE', baseValue: 15, deviationPercentage: 40 },
     outputMessage:
       'More users than usual are leaving conversations without finishing ({{value}}%). Review your chatbot flows — something might be confusing or broken.',
-    recipients: [],
+    recipients: [
+      { channel: 'IN_APP', destination: adminUser.id },
+      { channel: 'EMAIL', destination: adminUser.email },
+    ],
   };
   const workflow3 = await prisma.workflow.upsert({
     where: { id: SEED_IDS.workflow3 },
@@ -158,7 +167,11 @@ async function main() {
     triggerConfig: { type: 'THRESHOLD', metric: 'wa_csat_score', operator: '<', value: 3.5 },
     outputMessage:
       'Customer satisfaction dropped to {{value}}/5. Users are not happy with the chatbot experience — review recent conversations to find what went wrong.',
-    recipients: [{ channel: 'IN_APP', destination: regularUser.id }],
+    recipients: [
+      { channel: 'IN_APP', destination: regularUser.id },
+      { channel: 'IN_APP', destination: adminUser.id },
+      { channel: 'EMAIL', destination: adminUser.email },
+    ],
   };
   const workflow4 = await prisma.workflow.upsert({
     where: { id: SEED_IDS.workflow4 },
@@ -180,7 +193,10 @@ async function main() {
     triggerConfig: { type: 'VARIANCE', baseValue: 2, deviationPercentage: 100 },
     outputMessage:
       'WhatsApp API errors jumped to {{value}}% — that is much higher than the usual 2%. This might be a rate limit or an outage on Meta side.',
-    recipients: [],
+    recipients: [
+      { channel: 'IN_APP', destination: adminUser.id },
+      { channel: 'EMAIL', destination: adminUser.email },
+    ],
   };
   const workflow5 = await prisma.workflow.upsert({
     where: { id: SEED_IDS.workflow5 },
@@ -202,7 +218,10 @@ async function main() {
     triggerConfig: { type: 'THRESHOLD', metric: 'wa_queue_depth', operator: '>=', value: 500 },
     outputMessage:
       '{{value}} messages are waiting to be sent — your outbound queue is backing up. This can cause delays for all users.',
-    recipients: [],
+    recipients: [
+      { channel: 'IN_APP', destination: adminUser.id },
+      { channel: 'EMAIL', destination: adminUser.email },
+    ],
   };
   const workflow6 = await prisma.workflow.upsert({
     where: { id: SEED_IDS.workflow6 },
@@ -363,13 +382,17 @@ async function main() {
   for (let i = 0; i < extraWorkflowDefs.length; i++) {
     const def = extraWorkflowDefs[i];
     const wfId = SEED_IDS.workflow(i + 7);
+    const wfRecipients = [
+      { channel: 'IN_APP', destination: adminUser.id },
+      { channel: 'EMAIL', destination: adminUser.email },
+    ];
     const wf = await prisma.workflow.upsert({
       where: { id: wfId },
       update: {
         triggerType: def.triggerType,
         triggerConfig: def.triggerConfig,
         outputMessage: def.outputMessage,
-        recipients: [],
+        recipients: wfRecipients,
       },
       create: {
         id: wfId,
@@ -379,7 +402,7 @@ async function main() {
         triggerType: def.triggerType,
         triggerConfig: def.triggerConfig,
         outputMessage: def.outputMessage,
-        recipients: [],
+        recipients: wfRecipients,
         userId: def.userId,
       },
     });

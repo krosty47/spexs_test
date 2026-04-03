@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { trpc } from '@/lib/trpc';
 import { Badge } from '@/components/ui/badge';
@@ -115,6 +115,15 @@ export default function WorkflowDetailPage() {
 
   const utils = trpc.useUtils();
   const workflowQuery = trpc.workflows.findOne.useQuery({ id: params.id });
+  const { data: users } = trpc.users.list.useQuery(undefined, { staleTime: 5 * 60 * 1000 });
+  const userById = useMemo(() => {
+    const map = new Map<string, { id: string; email: string; name: string }>();
+    for (const u of users ?? []) {
+      map.set(u.id, u);
+      map.set(u.email, u);
+    }
+    return map;
+  }, [users]);
   const toggleMutation = trpc.workflows.toggleActive.useMutation({
     onSuccess: () => {
       utils.workflows.findOne.invalidate({ id: params.id });
@@ -273,24 +282,32 @@ export default function WorkflowDetailPage() {
             <CardContent>
               {recipients.length > 0 ? (
                 <div className="space-y-2">
-                  {recipients.map((recipient) => (
-                    <div
-                      key={`${recipient.channel}-${recipient.destination}`}
-                      className="flex items-center gap-3 rounded-md border p-3"
-                    >
-                      {recipient.channel === 'EMAIL' ? (
-                        <Mail className="h-4 w-4 shrink-0 text-[var(--muted-foreground)]" />
-                      ) : (
-                        <Bell className="h-4 w-4 shrink-0 text-[var(--muted-foreground)]" />
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm">{recipient.destination}</p>
+                  {recipients.map((recipient) => {
+                    const isEmail = recipient.channel === 'EMAIL';
+                    const matchedUser = userById.get(recipient.destination);
+                    const displayName = matchedUser
+                      ? `${matchedUser.name} (${matchedUser.email})`
+                      : recipient.destination;
+
+                    return (
+                      <div
+                        key={`${recipient.channel}-${recipient.destination}`}
+                        className="flex items-center gap-3 rounded-md border p-3"
+                      >
+                        {isEmail ? (
+                          <Mail className="h-4 w-4 shrink-0 text-[var(--muted-foreground)]" />
+                        ) : (
+                          <Bell className="h-4 w-4 shrink-0 text-[var(--muted-foreground)]" />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm">{displayName}</p>
+                        </div>
+                        <Badge variant="outline" className="shrink-0 text-xs">
+                          {isEmail ? 'Email' : 'In-App'}
+                        </Badge>
                       </div>
-                      <Badge variant="outline" className="shrink-0 text-xs">
-                        {recipient.channel === 'EMAIL' ? 'Email' : 'In-App'}
-                      </Badge>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <p className="text-sm text-[var(--muted-foreground)]">
